@@ -190,7 +190,7 @@ const LoginPage = () => {
         <Button
           onClick={() => {
             window.location.href =
-              "http://localhost:5000/api/auth/google";
+              import.meta.env.VITE_API_URL + "/auth/google";
           }}
           type="button"
           variant="outline"
