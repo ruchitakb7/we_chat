@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {checkUsernameAvailability,updateUserProfile,} from "../../service/authservice";
 
 interface AccountSettingsProps {
+  fullName?: string | null;
   username: string;
   email: string;
   profileimg: string | null;
@@ -19,12 +20,18 @@ type UsernameStatus =
   | "error";
 
 function AccountSettings({
+  fullName,
   username,
   email,
   profileimg,
 }: AccountSettingsProps) {
-  const [editingField, setEditingField] =
-    useState<EditingField>(null);
+  const [editingField, setEditingField] = useState<EditingField>(null);
+
+  const [currentFullName, setCurrentFullName] =
+    useState(fullName || "");
+
+  const [newFullName, setNewFullName] =
+    useState(fullName || "");
 
   const [currentUsername, setCurrentUsername] =
     useState(username || "");
@@ -52,9 +59,11 @@ function AccountSettings({
 
   
   useEffect(() => {
+    setCurrentFullName(fullName || "");
+    setNewFullName(fullName || "");
     setCurrentUsername(username || "");
     setNewUsername(username || "");
-  }, [username]);
+  }, [fullName, username]);
 
    const isEditing = editingField !== null;
 
@@ -155,6 +164,7 @@ function AccountSettings({
   const cancelEditing = () => {
     setEditingField(null);
 
+    setNewFullName(currentFullName);
     setNewUsername(currentUsername);
 
     setNewPassword("");
@@ -172,6 +182,35 @@ function AccountSettings({
     }
 
     setUpdateError("");
+
+    if (editingField === "fullName") {
+      const trimmedFullName = newFullName.trim();
+
+      if (!trimmedFullName || !/\p{L}/u.test(trimmedFullName)) {
+        setUpdateError("Full name must contain at least one letter.");
+        return;
+      }
+
+      try {
+        setUpdating(true);
+
+        const result = await updateUserProfile({
+          fullName: trimmedFullName,
+        });
+
+        const updatedFullName = result.user?.fullName || trimmedFullName;
+        setCurrentFullName(updatedFullName);
+        setNewFullName(updatedFullName);
+        setEditingField(null);
+      } catch (error) {
+        console.error("Full name update failed:", error);
+        setUpdateError("Unable to update full name. Please try again.");
+      } finally {
+        setUpdating(false);
+      }
+
+      return;
+    }
 
    
     if (editingField === "username") {
@@ -299,6 +338,8 @@ function AccountSettings({
 
   const isUpdateDisabled =
     updating ||
+    (editingField === "fullName" &&
+      (!newFullName.trim() || !/\p{L}/u.test(newFullName.trim()))) ||
     (editingField === "username" &&
       usernameStatus !== "available") ||
     (editingField === "password" &&
@@ -359,6 +400,68 @@ function AccountSettings({
                 <p className="mt-1 text-xs text-slate-500">
                   {email}
                 </p>
+              </div>
+            </div>
+          </section>
+
+          {/* FULL NAME */}
+          <section className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <div className="mb-4">
+              <h3 className="text-base font-semibold text-slate-900">
+                Full name
+              </h3>
+              <p className="mt-1 text-sm text-slate-500">
+                This is the name shown on your WeTalk profile.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white">
+              <div className="flex items-start gap-3 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="mb-1 text-xs text-slate-400">Full name</p>
+                  {editingField === "fullName" ? (
+                    <>
+                      <input
+                        autoFocus
+                        type="text"
+                        value={newFullName}
+                        onChange={(event) => setNewFullName(event.target.value)}
+                        placeholder="Enter your full name"
+                        className="w-full border-b border-indigo-500 bg-transparent py-1 text-sm font-medium text-slate-900 outline-none"
+                      />
+                      {updateError && (
+                        <p className="mt-2 text-xs text-red-500">{updateError}</p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="break-all text-sm font-medium text-slate-800">
+                      {currentFullName || "Add full name"}
+                    </p>
+                  )}
+                </div>
+
+                {editingField !== "fullName" ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewFullName(currentFullName);
+                      startEditing("fullName");
+                    }}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                    aria-label="Edit full name"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={cancelEditing}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100"
+                    aria-label="Cancel editing full name"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             </div>
           </section>

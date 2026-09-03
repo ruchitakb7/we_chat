@@ -13,6 +13,7 @@ const SignupPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [formValues, setFormValues] = useState({
+    fullName: "",
     email: "",
     password: "",
   });
@@ -31,10 +32,17 @@ const SignupPage = () => {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setErrorMessage("");
+
+    const fullName = formValues.fullName.trim();
+    if (!fullName || !/\p{L}/u.test(fullName)) {
+      setErrorMessage("Please enter a valid full name with at least one letter.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      await signupUser(formValues.email, formValues.password);
+      await signupUser(fullName, formValues.email, formValues.password);
       navigate("/login");
     } catch (error: any) {
       const message =
@@ -77,6 +85,26 @@ const SignupPage = () => {
               {errorMessage}
             </div>
           ) : null}
+
+          <div>
+            <label
+              htmlFor="fullName"
+              className="mb-2 block text-sm font-medium text-slate-300"
+            >
+              Full name
+            </label>
+
+            <Input
+              id="fullName"
+              name="fullName"
+              type="text"
+              value={formValues.fullName}
+              onChange={handleChange}
+              placeholder="Enter your full name"
+              className="h-12 rounded-xl border-white/10 bg-[#1d2027] text-white placeholder:text-slate-500 focus-visible:ring-violet-500"
+              required
+            />
+          </div>
 
           <div>
             <label

@@ -1,10 +1,12 @@
 import api from "../lib/axios";
 
 export const signupUser = async (
+  fullName: string,
   email: string,
   password: string
 ) => {
   const response = await api.post("/auth/signup", {
+    fullName,
     email,
     password,
   });
@@ -45,6 +47,7 @@ export const checkUsernameAvailability = async (
 };
 
 interface UpdateUserProfilePayload {
+  fullName?: string;
   username?: string;
   password?: string;
   profileimg?: string | null;
@@ -56,4 +59,14 @@ export const updateUserProfile = async (
   const response = await api.patch("/auth/profile", data);
 
   return response.data;
+};
+
+
+export const handleLogout = async () => {
+  try {
+    const res=await api.post("/auth/logout");
+    return res.data;
+  } catch (error) {
+    console.error("Logout failed:", error);
+  }
 };

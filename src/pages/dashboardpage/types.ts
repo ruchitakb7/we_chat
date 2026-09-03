@@ -20,6 +20,7 @@ export type Message = {
 
 export type User = {
   id: string;
+  fullName?: string | null;
   username: string | null;
   email: string;
   profileimg: string | null;

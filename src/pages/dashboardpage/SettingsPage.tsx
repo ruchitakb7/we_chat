@@ -2,6 +2,7 @@ import {
     ArrowLeft,
     Bell,
     Lock,
+    LogOut,
     Palette,
     ShieldCheck,
     UserRound,
@@ -10,6 +11,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import AccountSettings from "./AccountPage"
+import {handleLogout} from "@/service/authservice";
 
 import type { User } from "./types";
 
@@ -22,8 +24,13 @@ const settingsSections = [
 
 function SettingsPage() {
     const navigate = useNavigate();
-    const { user: currentUser, loading } = useAuth();
+    const { user: currentUser, loading, logout } = useAuth();
     const [activeSection, setActiveSection] = useState("Account");
+
+    const onLogout = async () => {
+        await handleLogout();
+        logout();
+    };
 
     if (loading) {
         return (
@@ -118,11 +125,26 @@ function SettingsPage() {
                                     </button>
                                 ))}
                             </nav>
+
+                            <button
+                                type="button"
+                                onClick={onLogout}
+                                className="mt-3 flex w-full items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-left text-red-600 transition hover:bg-red-100"
+                            >
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-red-600">
+                                    <LogOut className="h-4 w-4" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-medium">Log out</p>
+                                    <p className="text-xs text-red-500">End this session</p>
+                                </div>
+                            </button>
                         </aside>
 
                         <main className="min-w-0 min-h-0 flex-1  overflow-y-auto bg-white">
                             {activeSection === "Account" && (
                                 <AccountSettings
+                                    fullName={safeUser.fullName}
                                     username={safeUser.username||"User"}
                                     email={safeUser.email}
                                     profileimg={safeUser.profileimg}
