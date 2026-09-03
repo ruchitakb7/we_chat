@@ -52,9 +52,9 @@ function SettingsPage() {
     };
 
     return (
-        <div className="h-screen overflow-hidden bg-slate-100 text-slate-800">
-            <div className="mx-auto h-full max-w-[1440px] p-4">
-                <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="min-h-dvh overflow-y-auto bg-slate-100 text-slate-800 lg:h-screen lg:overflow-hidden">
+            <div className="mx-auto min-h-dvh max-w-[1440px] p-4 lg:h-full">
+                <div className="flex min-h-dvh flex-col rounded-2xl border border-slate-200 bg-white shadow-sm lg:h-full lg:overflow-hidden">
                     <header className="flex items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-6">
                         <button
                             type="button"
@@ -78,7 +78,7 @@ function SettingsPage() {
                         </div>
                     </header>
 
-                    <div className="flex min-h-0 flex-col lg:flex-row">
+                    <div className="flex flex-col lg:min-h-0 lg:flex-1 lg:flex-row">
                         <aside className="w-full border-b border-slate-200 bg-slate-50 p-4 lg:w-[300px] lg:border-r lg:border-b-0">
                             <div className="mb-6 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3">
                                 <div className="relative">
@@ -141,7 +141,7 @@ function SettingsPage() {
                             </button>
                         </aside>
 
-                        <main className="min-w-0 min-h-0 flex-1  overflow-y-auto bg-white">
+                        <main className="min-w-0 bg-white lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
                             {activeSection === "Account" && (
                                 <AccountSettings
                                     fullName={safeUser.fullName}
