@@ -10,7 +10,7 @@ interface AccountSettingsProps {
   profileimg: string | null;
 }
 
-type EditingField = "username" | "password" | "profile" | null;
+type EditingField = "username" | "password" | "profile" | "fullName" | null;
 
 type UsernameStatus =
   | "idle"
