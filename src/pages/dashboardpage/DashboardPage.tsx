@@ -155,6 +155,7 @@ function DashboardPage() {
       preview: "Start a conversation",
       time: "Now",
       userId: privateChat.userId,
+      type: privateChat.type,
       unread: 0,
       online: true,
       avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(privateChat.name)}&background=4f46e5&color=fff`,
