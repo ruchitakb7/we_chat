@@ -110,6 +110,37 @@ function MessageBubble({ message, chat }: { message: Message; chat: ChatItem }) 
   );
 }
 
+function formatLastSeen(last_seen: string | Date | null | undefined) {
+  if (!last_seen) {
+    return "Last seen unavailable";
+  }
+
+  const elapsedMinutes = Math.floor(
+    (Date.now() - new Date(last_seen).getTime()) / 60000,
+  );
+
+  if (Number.isNaN(elapsedMinutes)) {
+    return "Last seen unavailable";
+  }
+
+  if (elapsedMinutes < 1) {
+    return "Last seen just now";
+  }
+
+  if (elapsedMinutes < 60) {
+    return `Last seen ${elapsedMinutes} min ago`;
+  }
+
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+
+  if (elapsedHours < 24) {
+    return `Last seen ${elapsedHours} ${elapsedHours === 1 ? "hour" : "hours"} ago`;
+  }
+
+  const elapsedDays = Math.floor(elapsedHours / 24);
+  return `Last seen ${elapsedDays} ${elapsedDays === 1 ? "day" : "days"} ago`;
+}
+
 export function ChatThread({
   selectedChat,
   messages,
@@ -127,9 +158,10 @@ export function ChatThread({
   onBack?: () => void;
   scrollRef: React.RefObject<HTMLDivElement | null>;
 }) {
-  const [isOnline, setIsOnline] = useState(selectedChat.online ?? false);
+  const [isOnline, setIsOnline] = useState(false);
+  const [last_seen, setlast_seen] = useState<string | null>(null);
 
-  console.log("ChatThread rendered");
+  // console.log("ChatThread rendered");
 console.log("Selected chat:", selectedChat);
 
 
@@ -139,8 +171,12 @@ console.log("Selected chat:", selectedChat);
     !selectedChat.userId
   ) {
     setIsOnline(false);
+    setlast_seen(null);
     return;
   }
+
+  setIsOnline(false);
+  setlast_seen(null);
 
   const targetUserId = selectedChat.userId;
 
@@ -151,24 +187,39 @@ console.log("Selected chat:", selectedChat);
   const handleStatus = ({
     userId,
     isOnline,
+    last_seen,
   }: {
     userId: string;
     isOnline: boolean;
+    last_seen?:Date | null;
   }) => {
     if (userId === targetUserId) {
+      console.log(
+        `User ${userId} is ${isOnline ? "online" : "offline"}`,
+        isOnline ? "" : `Last seen: ${last_seen ?? "unavailable"}`,
+      );
       setIsOnline(isOnline);
+      setlast_seen(isOnline ? null : last_seen ? String(last_seen) : null);
     }
   };
 
   const handleOnline = (userId: string) => {
     if (userId === targetUserId) {
       setIsOnline(true);
+      setlast_seen(null);
     }
   };
 
-  const handleOffline = (userId: string) => {
+  const handleOffline = ({
+    userId,
+    last_seen,
+  }: {
+    userId: string;
+    last_seen?: string | Date | null;
+  }) => {
     if (userId === targetUserId) {
       setIsOnline(false);
+      setlast_seen(last_seen ? String(last_seen) : null);
     }
   };
 
@@ -188,7 +239,7 @@ console.log("Selected chat:", selectedChat);
     socket.off("user:online", handleOnline);
     socket.off("user:offline", handleOffline);
   };
-}, [selectedChat]);
+  }, [selectedChat]);
   const displayOnline = selectedChat.type === "private" ? isOnline : false;
 
   return (
@@ -212,7 +263,7 @@ console.log("Selected chat:", selectedChat);
 
             {selectedChat.type === "private" && (
               <p className="text-xs text-slate-500">
-                {isOnline ? "Online" : "Offline"}
+                {isOnline ? "Online" : formatLastSeen(last_seen)}
               </p>
             )}
           </div>
@@ -252,9 +303,9 @@ console.log("Selected chat:", selectedChat);
           <div className="flex items-center gap-2 px-3 pt-2.5">
             <button
               aria-label="Attach file"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-indigo-600"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-indigo-600"
             >
-              <Paperclip className="h-5 w-5" />
+              <Paperclip className="h-3 w-3" />
             </button>
             <textarea
               value={draft}
@@ -271,28 +322,28 @@ console.log("Selected chat:", selectedChat);
             />
             <button
               aria-label="Voice message"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-indigo-600"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-indigo-600"
             >
-              <Mic className="h-5 w-5" />
+              <Mic className="h-4 w-4" />
             </button>
             <button
               onClick={onSend}
               disabled={!draft.trim()}
               className={cn(
-                "flex h-10 shrink-0 items-center gap-1.5 rounded-xl px-4 text-sm font-medium transition",
+                "flex h-8 shrink-0 items-center gap-1.5 rounded-xl px-3 text-sm font-medium transition",
                 draft.trim()
                   ? "bg-indigo-600 text-white hover:bg-indigo-700"
                   : "cursor-not-allowed bg-indigo-600/50 text-white",
               )}
             >
               Send
-              <Send className="h-4 w-4" />
+              <Send className="h-3 w-3" />
             </button>
           </div>
           <div className="flex items-center justify-between px-4 pb-2.5 pt-1">
-            <p className="text-[11px] text-slate-400">
+            {/* <p className="text-[11px] text-slate-400">
               Press Enter to send, Shift + Enter for a new line
-            </p>
+            </p> */}
             {displayOnline && (
               <p className="flex items-center gap-1 text-[11px] text-slate-400">
                 {selectedChat.name.split(" ")[0]} is typing...

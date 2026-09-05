@@ -157,7 +157,7 @@ function DashboardPage() {
       userId: privateChat.userId,
       type: privateChat.type,
       unread: 0,
-      online: true,
+      online: false,
       avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(privateChat.name)}&background=4f46e5&color=fff`,
     };
 

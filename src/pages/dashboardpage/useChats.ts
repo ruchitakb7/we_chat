@@ -16,7 +16,7 @@ function mapChatToChatItem(chat: UserChat): ChatItem {
     preview: chat.lastMessage || "Start a conversation",
     time: new Date(chat.createdAt).toLocaleDateString(),
     unread: 0,
-    online: chat.type === "private",
+    online: false,
     group: chat.type === "group",
     groupColor: chat.type === "group" ? "bg-indigo-600" : undefined,
     avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.name || chat.user?.fullName || chat.user?.username || "Chat")}&background=4f46e5&color=fff`,
