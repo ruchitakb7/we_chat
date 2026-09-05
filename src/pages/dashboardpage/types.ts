@@ -1,5 +1,8 @@
 export type ChatItem = {
   id: string;
+  type: "private" | "group";
+  userId?: string;
+  userName?: string;
   name: string;
   preview: string;
   time: string;

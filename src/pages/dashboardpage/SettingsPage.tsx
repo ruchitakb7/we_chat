@@ -12,6 +12,7 @@ import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import AccountSettings from "./AccountPage"
 import {handleLogout} from "@/service/authservice";
+import { getUploadedFileUrl } from "@/service/uploadfile";
 
 import type { User } from "./types";
 
@@ -24,7 +25,7 @@ const settingsSections = [
 
 function SettingsPage() {
     const navigate = useNavigate();
-    const { user: currentUser, loading, logout } = useAuth();
+    const { user: currentUser, loading, logout, refreshUser } = useAuth();
     const [activeSection, setActiveSection] = useState("Account");
 
     const onLogout = async () => {
@@ -85,7 +86,7 @@ function SettingsPage() {
                                     <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-indigo-100 text-sm font-semibold text-indigo-600">
                                         {safeUser.profileimg ? (
                                             <img
-                                                src={safeUser.profileimg}
+                                                src={getUploadedFileUrl(safeUser.profileimg) ?? undefined}
                                                 alt={safeUser.username || "User"}
                                                 className="h-full w-full object-cover"
                                             />
@@ -148,6 +149,7 @@ function SettingsPage() {
                                     username={safeUser.username||"User"}
                                     email={safeUser.email}
                                     profileimg={safeUser.profileimg}
+                                    onProfileUpdated={refreshUser}
                                 />
                             )}
 

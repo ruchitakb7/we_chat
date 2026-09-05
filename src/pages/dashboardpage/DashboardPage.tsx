@@ -1,15 +1,15 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Menu, MessageSquareText, Phone, Settings, SquarePen, UserRound } from "lucide-react";
-import { Navigate } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
 import { ChatSidebar, ChatSidebarHeader } from "./ChatSidebar";
 import { ChatSidebarFooter } from "./chatSidebarfooter";
 import { ChatThread } from "./ChatThread";
 import type { ChatItem, Message, User } from "./types";
+import { useChats } from "./useChats";
 
-const chats: ChatItem[] = [
+/*
   {
     id: "amit",
     name: "Amit Sharma",
@@ -86,7 +86,7 @@ const chats: ChatItem[] = [
     groupColor: "bg-amber-400",
     avatar: "",
   },
-];
+]; */
 
 const initialThread: Message[] = [
   {
@@ -120,7 +120,9 @@ const logo = (
 
 function DashboardPage() {
   const { user: currentUser, loading } = useAuth();
-  const [selectedChatId, setSelectedChatId] = useState("amit");
+  const location = useLocation();
+  const { chats: chatList, loading: chatsLoading, error: chatsError, reloadChats } = useChats();
+  const [selectedChatId, setSelectedChatId] = useState("");
   const [draft, setDraft] = useState("");
   const [query, setQuery] = useState("");
   const [messages, setMessages] = useState<Message[]>(initialThread);
@@ -128,9 +130,45 @@ function DashboardPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
+  useEffect(() => {
+    const privateChat = location.state?.privateChat;
+    const groupChat = location.state?.groupChat;
+
+    if (!privateChat && !groupChat) return;
+
+    if (groupChat) {
+      const groupId = groupChat.id ?? groupChat.chat?.id;
+
+      void reloadChats().then(() => {
+        if (groupId !== undefined) {
+          setSelectedChatId(String(groupId));
+        }
+        setMobileThreadOpen(true);
+      });
+      navigate("/dashboard", { replace: true, state: null });
+      return;
+    }
+
+    const chat: ChatItem = {
+      id: String(privateChat.id),
+      name: privateChat.name,
+      preview: "Start a conversation",
+      time: "Now",
+      userId: privateChat.userId,
+      unread: 0,
+      online: true,
+      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(privateChat.name)}&background=4f46e5&color=fff`,
+    };
+
+    setSelectedChatId(chat.id);
+    setMobileThreadOpen(true);
+    void reloadChats();
+    navigate("/dashboard", { replace: true, state: null });
+  }, [location.state, navigate, reloadChats]);
+
   const selectedChat = useMemo(
-    () => chats.find((chat) => chat.id === selectedChatId) ?? chats[0],
-    [selectedChatId],
+    () => chatList.find((chat) => chat.id === selectedChatId) ?? chatList[0],
+    [chatList, selectedChatId],
   );
 
   if (loading) {
@@ -143,6 +181,18 @@ function DashboardPage() {
 
   if (!currentUser) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (chatsLoading) {
+    return <div className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-500">Loading chats...</div>;
+  }
+
+  if (chatsError) {
+    return <div className="flex min-h-screen items-center justify-center bg-slate-100 text-rose-500">Unable to load chats.</div>;
+  }
+
+  if (!selectedChat) {
+    return <div className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-500">No chats yet. Create a new chat to get started.</div>;
   }
 
   const sendMessage = () => {
@@ -194,14 +244,15 @@ function DashboardPage() {
       <div className="mx-auto hidden h-screen max-w-[1440px] flex-col p-4 lg:flex">
         <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex w-[360px] shrink-0 flex-col border-r border-slate-200 bg-white">
-            <ChatSidebarHeader logo={logo} />
+            <ChatSidebarHeader logo={logo} onNewChat={() => navigate("/new-chat")} />
             <div className="min-h-0 flex-1">
               <ChatSidebar
-                chats={chats}
+                chats={chatList}
                 selectedChatId={selectedChatId}
                 query={query}
                 onQueryChange={setQuery}
                 onSelectChat={setSelectedChatId}
+                onNewChat={() => navigate("/new-chat")}
               />
             </div>
             <ChatSidebarFooter user={safeUser} />
@@ -243,6 +294,7 @@ function DashboardPage() {
               <span className="text-lg font-bold tracking-tight text-indigo-600">WeTalkkk</span>
               <button
                 aria-label="New message"
+                onClick={() => navigate("/new-chat")}
                 className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100"
               >
                 <SquarePen className="h-5 w-5" />
@@ -254,7 +306,7 @@ function DashboardPage() {
             <div className="min-h-0 flex-1">
               {/* <ChatSidebarHeader mobileMode onBack={() => setMobileThreadOpen(false)} /> */}
               <ChatSidebar
-                chats={chats}
+                chats={chatList}
                 selectedChatId={selectedChatId}
                 query={query}
                 onQueryChange={setQuery}

@@ -8,18 +8,33 @@ import LandingPage from "./pages/Landingpage";
 import LoginPage from "./pages/Loginpage";
 import SignupPage from "./pages/Signuppage";
 import DashboardPage from "./pages/dashboardpage/DashboardPage";
+import NewChatPage from "./pages/dashboardpage/NewChatPage";
 import SettingsPage from "./pages/dashboardpage/SettingsPage";
 import socket from "./lib/socket";
 
 function App() {
 
- useEffect(() => {
-    socket.on("connect", () => {
+useEffect(() => {
+    const handleConnect = () => {
       console.log("Connected to socket:", socket.id);
-    });
+    };
+
+    const handleDisconnect = () => {
+      console.log("Disconnected from socket");
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
+
+    // Connect socket
+    if (!socket.connected) {
+      socket.connect();
+    }
 
     return () => {
-      socket.off("connect");
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
+      socket.disconnect();
     };
   }, []);
 
@@ -29,6 +44,7 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/dashboard" element={<DashboardPage />} />
+      <Route path="/new-chat" element={<NewChatPage />} />
       <Route path="/settings" element={<SettingsPage />} />
      
       <Route path="*" element={<Navigate to="/" replace />} />

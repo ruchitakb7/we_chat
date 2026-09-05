@@ -1,6 +1,6 @@
 import { Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
+import {  getUploadedFileUrl } from "@/service/uploadfile";  
 import type { User } from "./types";
 
 export function ChatSidebarFooter({ user }: { user: User }) {
@@ -12,7 +12,7 @@ export function ChatSidebarFooter({ user }: { user: User }) {
         <div className="h-10 w-10 overflow-hidden rounded-full">
           {user.profileimg ? (
             <img
-              src={user.profileimg}
+              src={getUploadedFileUrl(user.profileimg)}
               alt={user.username || "User"}
               className="h-full w-full object-cover"
               loading="lazy"

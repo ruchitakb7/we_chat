@@ -1,13 +1,14 @@
 
 import { Check, Pencil, UserRound, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import {checkUsernameAvailability,updateUserProfile,} from "../../service/authservice";
-
+import {getUploadedFileUrl,uploadFile,} from "../../service/uploadfile";
 interface AccountSettingsProps {
   fullName?: string | null;
   username: string;
   email: string;
   profileimg: string | null;
+  onProfileUpdated?: () => Promise<boolean> | void;
 }
 
 type EditingField = "username" | "password" | "profile" | "fullName" | null;
@@ -24,8 +25,10 @@ function AccountSettings({
   username,
   email,
   profileimg,
+  onProfileUpdated,
 }: AccountSettingsProps) {
   const [editingField, setEditingField] = useState<EditingField>(null);
+  const profileInputRef = useRef<HTMLInputElement>(null);
 
   const [currentFullName, setCurrentFullName] =
     useState(fullName || "");
@@ -57,6 +60,9 @@ function AccountSettings({
   const [updating, setUpdating] =
     useState(false);
 
+  const [profileImage, setProfileImage] =
+    useState(getUploadedFileUrl(profileimg));
+
   
   useEffect(() => {
     setCurrentFullName(fullName || "");
@@ -64,6 +70,16 @@ function AccountSettings({
     setCurrentUsername(username || "");
     setNewUsername(username || "");
   }, [fullName, username]);
+
+  useEffect(() => {
+    setProfileImage(getUploadedFileUrl(profileimg));
+  }, [profileimg]);
+
+  useEffect(() => {
+    if (editingField === "profile") {
+      profileInputRef.current?.click();
+    }
+  }, [editingField]);
 
    const isEditing = editingField !== null;
 
@@ -174,6 +190,40 @@ function AccountSettings({
     setUsernameMessage("");
 
     setUpdateError("");
+  };
+
+  const handleProfileImageChange = async (
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setUpdateError("Please choose an image file.");
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      setUpdateError("");
+
+      const uploadedFile = await uploadFile(file);
+      await updateUserProfile({ profileimg: uploadedFile.path });
+
+      setProfileImage(getUploadedFileUrl(uploadedFile.path));
+      setEditingField(null);
+      await onProfileUpdated?.();
+    } catch (error) {
+      console.error("Profile image update failed:", error);
+      setUpdateError("Unable to update profile picture. Please try again.");
+    } finally {
+      setUpdating(false);
+    }
   };
 
   const handleUpdate = async () => {
@@ -323,17 +373,6 @@ function AccountSettings({
       return;
     }
 
-    /*
-     * PROFILE PICTURE
-     *
-     * The image upload itself will be implemented
-     * separately. Once we have the uploaded image URL,
-     * we can call:
-     *
-     * await updateUserProfile({
-     *   profileimg: imageUrl,
-     * });
-     */
   };
 
   const isUpdateDisabled =
@@ -369,9 +408,9 @@ function AccountSettings({
             <div className="flex items-center gap-5">
               <div className="relative">
                 <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-indigo-100 text-indigo-600">
-                  {profileimg ? (
+                  {profileImage ? (
                     <img
-                      src={profileimg}
+                      src={profileImage}
                       alt={currentUsername || "User"}
                       className="h-full w-full object-cover"
                     />
@@ -382,14 +421,20 @@ function AccountSettings({
 
                 <button
                   type="button"
-                  onClick={() =>
-                    startEditing("profile")
-                  }
+                  onClick={() => startEditing("profile")}
+                  disabled={updating}
                   className="absolute bottom-0 right-0 flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700"
                   aria-label="Edit profile picture"
                 >
                   <Pencil className="h-4 w-4" />
                 </button>
+                <input
+                  ref={profileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleProfileImageChange}
+                />
               </div>
 
               <div>
@@ -402,6 +447,10 @@ function AccountSettings({
                 </p>
               </div>
             </div>
+
+            {updateError && editingField === "profile" && (
+              <p className="mt-3 text-xs text-red-500">{updateError}</p>
+            )}
           </section>
 
           {/* FULL NAME */}

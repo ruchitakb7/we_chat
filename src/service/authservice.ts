@@ -70,3 +70,23 @@ export const handleLogout = async () => {
     console.error("Logout failed:", error);
   }
 };
+
+
+
+export interface SearchUser {
+  id: number;
+  username: string;
+  fullName: string;
+}
+
+export const searchUsers = async (
+  query: string
+): Promise<SearchUser[]> => {
+  const response = await api.get("/auth/search", {
+    params: {
+      q: query,
+    },
+  });
+
+  return response.data.users;
+}

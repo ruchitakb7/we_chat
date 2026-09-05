@@ -10,6 +10,8 @@ import {
   Video,
   Mic,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import socket from "../../lib/socket";
 
 import { cn } from "@/lib/utils";
 import type { ChatItem, Message } from "./types";
@@ -17,9 +19,11 @@ import type { ChatItem, Message } from "./types";
 function ChatAvatar({
   chat,
   size = "md",
+  online,
 }: {
   chat: ChatItem;
   size?: "md" | "lg";
+  online?: boolean;
 }) {
   const dim = size === "md" ? "h-12 w-12" : "h-11 w-11";
 
@@ -45,7 +49,7 @@ function ChatAvatar({
           />
         </div>
       )}
-      {chat.online && (
+      {(online ?? chat.online) && (
         <span className="absolute right-0 bottom-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
       )}
     </div>
@@ -123,6 +127,70 @@ export function ChatThread({
   onBack?: () => void;
   scrollRef: React.RefObject<HTMLDivElement | null>;
 }) {
+  const [isOnline, setIsOnline] = useState(selectedChat.online ?? false);
+
+  console.log("ChatThread rendered");
+console.log("Selected chat:", selectedChat);
+
+
+  useEffect(() => {
+  if (
+    selectedChat.type !== "private" ||
+    !selectedChat.userId
+  ) {
+    setIsOnline(false);
+    return;
+  }
+
+  const targetUserId = selectedChat.userId;
+
+  const checkOnlineStatus = () => {
+    socket.emit("check:user:online", targetUserId);
+  };
+
+  const handleStatus = ({
+    userId,
+    isOnline,
+  }: {
+    userId: string;
+    isOnline: boolean;
+  }) => {
+    if (userId === targetUserId) {
+      setIsOnline(isOnline);
+    }
+  };
+
+  const handleOnline = (userId: string) => {
+    if (userId === targetUserId) {
+      setIsOnline(true);
+    }
+  };
+
+  const handleOffline = (userId: string) => {
+    if (userId === targetUserId) {
+      setIsOnline(false);
+    }
+  };
+
+  socket.on("connect", checkOnlineStatus);
+  socket.on("user:online:status", handleStatus);
+  socket.on("user:online", handleOnline);
+  socket.on("user:offline", handleOffline);
+
+  // If already connected, check immediately
+  if (socket.connected) {
+    checkOnlineStatus();
+  }
+
+  return () => {
+    socket.off("connect", checkOnlineStatus);
+    socket.off("user:online:status", handleStatus);
+    socket.off("user:online", handleOnline);
+    socket.off("user:offline", handleOffline);
+  };
+}, [selectedChat]);
+  const displayOnline = selectedChat.type === "private" ? isOnline : false;
+
   return (
     <section className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-white">
       <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
@@ -134,18 +202,19 @@ export function ChatThread({
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <ChatAvatar chat={selectedChat} size="lg" />
+          <ChatAvatar chat={selectedChat} size="lg" online={displayOnline} />
           <div>
-            <p className="text-sm font-semibold text-slate-900">{selectedChat.name}</p>
-            <p
-              className={cn(
-                "flex items-center gap-1.5 text-xs",
-                selectedChat.online ? "text-slate-500" : "text-slate-400",
-              )}
-            >
-              {selectedChat.online && <span className="h-2 w-2 rounded-full bg-emerald-500" />}
-              {selectedChat.online ? "Online" : "Offline"}
-            </p>
+            <h2 className="font-semibold">
+              {selectedChat.type === "private"
+                ? selectedChat.userName || selectedChat.name
+                : selectedChat.name}
+            </h2>
+
+            {selectedChat.type === "private" && (
+              <p className="text-xs text-slate-500">
+                {isOnline ? "Online" : "Offline"}
+              </p>
+            )}
           </div>
         </div>
 
@@ -224,7 +293,7 @@ export function ChatThread({
             <p className="text-[11px] text-slate-400">
               Press Enter to send, Shift + Enter for a new line
             </p>
-            {selectedChat.online && (
+            {displayOnline && (
               <p className="flex items-center gap-1 text-[11px] text-slate-400">
                 {selectedChat.name.split(" ")[0]} is typing...
                 <span className="flex gap-0.5">

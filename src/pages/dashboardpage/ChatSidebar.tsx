@@ -27,7 +27,7 @@ function ChatAvatar({
       ) : (
         <div className={cn("overflow-hidden rounded-full", dim)}>
           <img
-            src={chat.avatar}
+            src={chat.name ? `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.name)}&background=4f46e5&color=fff` : chat.avatar}
             alt={chat.name}
             className="h-full w-full object-cover"
             loading="lazy"
@@ -88,10 +88,12 @@ export function ChatSidebarHeader({
   logo,
   mobileMode = false,
   onBack,
+  onNewChat,
 }: {
   logo?: React.ReactNode;
   mobileMode?: boolean;
   onBack?: () => void;
+  onNewChat?: () => void;
 }) {
   if (mobileMode) {
     return (
@@ -106,6 +108,7 @@ export function ChatSidebarHeader({
         <span className="text-lg font-bold tracking-tight text-indigo-600">WeTalk</span>
         <button
           aria-label="New message"
+          onClick={onNewChat}
           className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100"
         >
           <Plus className="h-5 w-5" />
@@ -119,6 +122,7 @@ export function ChatSidebarHeader({
       {logo}
       <button
         aria-label="New message"
+        onClick={onNewChat}
         className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-indigo-600"
       >
         <Plus className="h-4 w-4" />
@@ -161,11 +165,13 @@ export function ChatSidebarList({
   selectedChatId,
   query,
   onSelectChat,
+  onNewChat,
 }: {
   chats: ChatItem[];
   selectedChatId: string;
   query: string;
   onSelectChat: (id: string) => void;
+  onNewChat?: () => void;
 }) {
   const visibleChats = chats.filter((chat) => {
     if (!query.trim()) return true;
@@ -179,6 +185,7 @@ export function ChatSidebarList({
         <h2 className="text-sm font-medium text-slate-500">Chats</h2>
         <button
           aria-label="New chat"
+          onClick={onNewChat}
           className="flex h-7 w-7 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-indigo-600"
         >
           <Plus className="h-4 w-4" />
@@ -210,6 +217,7 @@ export function ChatSidebar({
   query,
   onQueryChange,
   onSelectChat,
+  onNewChat,
   mobileMode = false,
 }: {
   chats: ChatItem[];
@@ -217,6 +225,7 @@ export function ChatSidebar({
   query: string;
   onQueryChange: (value: string) => void;
   onSelectChat: (id: string) => void;
+  onNewChat?: () => void;
   mobileMode?: boolean;
 }) {
   return (
@@ -228,6 +237,7 @@ export function ChatSidebar({
           selectedChatId={selectedChatId}
           query={query}
           onSelectChat={onSelectChat}
+          onNewChat={onNewChat}
         />
       )}
       {mobileMode && (
