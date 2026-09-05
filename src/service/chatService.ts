@@ -31,6 +31,7 @@ export interface UserChat {
     username: string;
     fullName: string | null;
   };
+  userId?: string | null;
   createdAt: string;
   lastMessage: string | null;
 }

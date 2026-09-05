@@ -10,7 +10,7 @@ function mapChatToChatItem(chat: UserChat): ChatItem {
   return {
     id: String(chat.id),
     type: chat.type,
-    userId: chat.userId||null,
+    userId: chat.userId ?? undefined,
     userName: chat.user?.fullName || chat.user?.username || undefined,
     name: chat.name || chat.user?.fullName || chat.user?.username || "Chat",
     preview: chat.lastMessage || "Start a conversation",

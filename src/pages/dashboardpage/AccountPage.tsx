@@ -61,7 +61,7 @@ function AccountSettings({
     useState(false);
 
   const [profileImage, setProfileImage] =
-    useState(getUploadedFileUrl(profileimg));
+    useState(profileimg ? getUploadedFileUrl(profileimg) : null);
 
   
   useEffect(() => {
@@ -72,7 +72,7 @@ function AccountSettings({
   }, [fullName, username]);
 
   useEffect(() => {
-    setProfileImage(getUploadedFileUrl(profileimg));
+    setProfileImage(profileimg ? getUploadedFileUrl(profileimg) : null);
   }, [profileimg]);
 
   useEffect(() => {
