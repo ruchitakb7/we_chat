@@ -192,10 +192,6 @@ function DashboardPage() {
     return <div className="flex min-h-screen items-center justify-center bg-slate-100 text-rose-500">Unable to load chats.</div>;
   }
 
-  if (!selectedChat) {
-    return <div className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-500">No chats yet. Create a new chat to get started.</div>;
-  }
-
   const sendMessage = () => {
     const text = draft.trim();
     if (!text) return;
@@ -259,19 +255,30 @@ function DashboardPage() {
             <ChatSidebarFooter user={safeUser} />
           </div>
 
-          <ChatThread
-            selectedChat={selectedChat}
-            messages={messages}
-            draft={draft}
-            onDraftChange={setDraft}
-            onSend={sendMessage}
-            scrollRef={scrollRef}
-          />
+          {selectedChat ? (
+            <ChatThread
+              selectedChat={selectedChat}
+              messages={messages}
+              draft={draft}
+              onDraftChange={setDraft}
+              onSend={sendMessage}
+              scrollRef={scrollRef}
+            />
+          ) : (
+            <section className="flex min-w-0 flex-1 items-center justify-center bg-slate-50 px-6 text-center">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-800">No chats yet</h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Create a new chat to get started.
+                </p>
+              </div>
+            </section>
+          )}
         </div>
       </div>
 
       <div className="flex h-dvh flex-col bg-white lg:hidden">
-        {mobileThreadOpen ? (
+        {mobileThreadOpen && selectedChat ? (
           <div className="min-h-0 flex-1">
             <ChatThread
               selectedChat={selectedChat}
