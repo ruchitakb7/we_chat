@@ -18,6 +18,9 @@ export type Message = {
   sender: "me" | "them";
   text: string;
   time: string;
+  type?: "text" | "image" | "video" | "file" | "audio";
+  mediaUrl?: string;
+  caption?: string;
 };
 
 

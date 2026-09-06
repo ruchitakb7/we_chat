@@ -8,106 +8,56 @@ import { ChatSidebarFooter } from "./chatSidebarfooter";
 import { ChatThread } from "./ChatThread";
 import type { ChatItem, Message, User } from "./types";
 import { useChats } from "./useChats";
+import { createMessage, getMessages } from "@/service/messageservice";
+import { getUploadedFileUrl, uploadFile } from "@/service/uploadfile";
+import socket from "@/lib/socket";
 
-/*
-  {
-    id: "amit",
-    name: "Amit Sharma",
-    preview: "Yes — let’s tighten that first step.",
-    time: "2m",
-    unread: 2,
-    online: true,
-    avatar:
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80",
-  },
-  {
-    id: "project",
-    name: "Project Team",
-    preview: "Rahul: Can we move it to Thursday?",
-    time: "10m",
-    unread: 5,
-    group: true,
-    groupColor: "bg-indigo-600",
-    avatar: "",
-  },
-  {
-    id: "priya",
-    name: "Priya Patel",
-    preview: "Sure! Will share the design.",
-    time: "1h",
-    unread: 1,
-    avatar:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80",
-  },
-  {
-    id: "rahul",
-    name: "Rahul Verma",
-    preview: "The spacing looks better now.",
-    time: "2h",
-    unread: 0,
-    avatar:
-      "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=200&q=80",
-  },
-  {
-    id: "design",
-    name: "Design Squad",
-    preview: "Neha: Added some comments",
-    time: "Yesterday",
-    unread: 0,
-    group: true,
-    groupColor: "bg-emerald-500",
-    avatar: "",
-  },
-  {
-    id: "neha",
-    name: "Neha Singh",
-    preview: "Let’s catch up tomorrow.",
-    time: "Yesterday",
-    unread: 0,
-    avatar:
-      "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=200&q=80",
-  },
-  {
-    id: "siddharth",
-    name: "Siddharth",
-    preview: "Thanks!",
-    time: "2d",
-    unread: 0,
-    avatar:
-      "https://images.unsplash.com/photo-1504593811423-6dd665756598?auto=format&fit=crop&w=200&q=80",
-  },
-  {
-    id: "marketing",
-    name: "Marketing Team",
-    preview: "Karan: Campaign analytics ready",
-    time: "3d",
-    unread: 0,
-    group: true,
-    groupColor: "bg-amber-400",
-    avatar: "",
-  },
-]; */
+type RawMessage = Record<string, unknown>;
 
-const initialThread: Message[] = [
-  {
-    id: 1,
-    sender: "me",
-    text: "How should we handle the empty state on the dashboard?\nNot sure what to show before a project exists.",
-    time: "10:42 AM",
-  },
-  {
-    id: 2,
-    sender: "them",
-    text: "Lead with a friendly prompt plus one clear action.\nA short line of copy, a single primary button, and a subtle illustration keeps it calm instead of empty.",
-    time: "10:42 AM",
-  },
-  {
-    id: 3,
-    sender: "me",
-    text: "Love that. Can you draft the empty-state copy for me?",
-    time: "10:44 AM",
-  },
-];
+function getMessageList(response: unknown): RawMessage[] {
+  if (Array.isArray(response)) {
+    return response.filter((message): message is RawMessage => Boolean(message && typeof message === "object"));
+  }
+
+  if (!response || typeof response !== "object") return [];
+
+  const payload = response as RawMessage;
+  const nested = payload.data ?? payload.messages;
+  return Array.isArray(nested)
+    ? nested.filter((message): message is RawMessage => Boolean(message && typeof message === "object"))
+    : [];
+}
+
+function mapApiMessage(rawMessage: RawMessage, currentUserId?: string): Message | null {
+  const id = Number(rawMessage.id);
+  const messageText = typeof rawMessage.message === "string" ? rawMessage.message : "";
+  const caption = typeof rawMessage.caption === "string" ? rawMessage.caption : undefined;
+  const type = ["text", "image", "video", "file", "audio"].includes(String(rawMessage.type))
+    ? (rawMessage.type as Message["type"])
+    : "text";
+  const createdAt = rawMessage.createdAt ?? rawMessage.created_at;
+  const senderId = String(rawMessage.senderId ?? rawMessage.sender_id ?? "");
+  const mediaPath = type === "text" ? undefined : messageText;
+  const mediaName = messageText.split("/").pop();
+
+  if (!Number.isFinite(id)) return null;
+
+  return {
+    id,
+    sender: senderId === currentUserId ? "me" : "them",
+    text: type === "text" ? messageText : mediaName ?? type ?? "file",
+    time: createdAt
+      ? new Date(String(createdAt)).toLocaleTimeString("en-IN", {
+        timeZone: "Asia/Kolkata",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+      : "",
+    type,
+    mediaUrl: mediaPath ? getUploadedFileUrl(mediaPath) : undefined,
+    caption,
+  };
+}
 
 const logo = (
   <div className="flex items-center gap-2.5">
@@ -124,8 +74,9 @@ function DashboardPage() {
   const { chats: chatList, loading: chatsLoading, error: chatsError, reloadChats } = useChats();
   const [selectedChatId, setSelectedChatId] = useState("");
   const [draft, setDraft] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [query, setQuery] = useState("");
-  const [messages, setMessages] = useState<Message[]>(initialThread);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -172,6 +123,64 @@ function DashboardPage() {
     [chatList, selectedChatId],
   );
 
+  useEffect(() => {
+    const chatId = selectedChat ? Number(selectedChat.id) : NaN;
+    if (!Number.isInteger(chatId)) {
+      setMessages([]);
+      return;
+    }
+
+    let active = true;
+    setMessages([]);
+
+    const handleNewMessage = (rawMessage: RawMessage) => {
+      const nestedChat = rawMessage.chat;
+      const nestedChatId = nestedChat && typeof nestedChat === "object"
+        ? (nestedChat as Record<string, unknown>).id
+        : undefined;
+      const incomingChatId = Number(rawMessage.chatId ?? rawMessage.chat_id ?? nestedChatId);
+      if (!active || incomingChatId !== chatId) return;
+
+      const newMessage = mapApiMessage(rawMessage, currentUser?.id);
+      if (!newMessage) return;
+
+      setMessages((previousMessages) => {
+        if (previousMessages.some((message) => message.id === newMessage.id)) {
+          return previousMessages;
+        }
+
+        return [...previousMessages, newMessage];
+      });
+    };
+
+    socket.on("new:message", handleNewMessage);
+
+    void getMessages(chatId)
+      .then((response) => {
+        if (!active) return;
+
+        const loadedMessages = getMessageList(response)
+          .map((message) => mapApiMessage(message, currentUser?.id))
+          .filter((message): message is Message => message !== null);
+        setMessages((previousMessages) => {
+          const loadedIds = new Set(loadedMessages.map((message) => message.id));
+          const liveMessages = previousMessages.filter((message) => !loadedIds.has(message.id));
+          return [...loadedMessages, ...liveMessages];
+        });
+      })
+      .catch((error) => {
+        if (active) {
+          console.error("Failed to load messages", error);
+          setMessages([]);
+        }
+      });
+
+    return () => {
+      active = false;
+      socket.off("new:message", handleNewMessage);
+    };
+  }, [currentUser?.id, selectedChat]);
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-500">
@@ -192,17 +201,42 @@ function DashboardPage() {
     return <div className="flex min-h-screen items-center justify-center bg-slate-100 text-rose-500">Unable to load chats.</div>;
   }
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     const text = draft.trim();
-    if (!text) return;
+    const chatId = selectedChat ? Number(selectedChat.id) : NaN;
+    if ((!text && !selectedFile) || !Number.isInteger(chatId)) return;
 
-    const time = new Date().toLocaleTimeString([], {
-      hour: "numeric",
-      minute: "2-digit",
-    });
+    const file = selectedFile;
 
-    setMessages((prev) => [...prev, { id: Date.now(), sender: "me", text, time }]);
+    try {
+      let type: "text" | "image" | "video" | "file" | "audio" = "text";
+      let message = text;
+
+      if (file) {
+        const uploadedFile = await uploadFile(file);
+        type = file.type.startsWith("image/")
+          ? "image"
+          : file.type.startsWith("video/")
+            ? "video"
+            : file.type.startsWith("audio/")
+              ? "audio"
+              : "file";
+        message = uploadedFile.path;
+      }
+
+      await createMessage({
+        chatId,
+        type,
+        message,
+        ...(file && text ? { caption: text } : {}),
+      });
+    } catch (error) {
+      console.error("Failed to send message", error);
+      return;
+    }
+
     setDraft("");
+    setSelectedFile(null);
 
     requestAnimationFrame(() => {
       scrollRef.current?.scrollTo({
@@ -260,8 +294,10 @@ function DashboardPage() {
               selectedChat={selectedChat}
               messages={messages}
               draft={draft}
+              selectedFile={selectedFile}
               onDraftChange={setDraft}
               onSend={sendMessage}
+              onFileChange={setSelectedFile}
               scrollRef={scrollRef}
             />
           ) : (
@@ -279,12 +315,14 @@ function DashboardPage() {
 
       <div className="flex h-dvh flex-col bg-white lg:hidden">
         {mobileThreadOpen && selectedChat ? (
-          <div className="min-h-0 flex-1">
+          <div className="h-full min-h-0 flex-1">
             <ChatThread
               selectedChat={selectedChat}
               messages={messages}
               draft={draft}
+              selectedFile={selectedFile}
               onDraftChange={setDraft}
+              onFileChange={setSelectedFile}
               onSend={sendMessage}
               onBack={() => setMobileThreadOpen(false)}
               scrollRef={scrollRef}
@@ -309,7 +347,7 @@ function DashboardPage() {
               </button>
             </header>
 
-          
+
 
             <div className="min-h-0 flex-1">
               {/* <ChatSidebarHeader mobileMode onBack={() => setMobileThreadOpen(false)} /> */}
@@ -325,7 +363,7 @@ function DashboardPage() {
 
             <nav className="flex items-center justify-around border-t border-slate-200 px-4 py-2">
               {[
-                { label: "Chats", active: true,path: "/chats", icon: MessageSquareText },
+                { label: "Chats", active: true, path: "/chats", icon: MessageSquareText },
                 { label: "Calls", active: false, path: "/calls", icon: Phone },
                 { label: "People", active: false, path: "/people", icon: UserRound },
                 { label: "Settings", active: false, path: "/settings", icon: Settings },

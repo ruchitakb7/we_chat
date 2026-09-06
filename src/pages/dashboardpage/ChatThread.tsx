@@ -1,16 +1,21 @@
 import {
   ArrowLeft,
   CheckCheck,
+  FileText,
   MoreVertical,
   Paperclip,
   Phone,
+  Plus,
   Search,
   Send,
+  Smile,
   Users,
   Video,
   Mic,
+  X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import EmojiPicker, { Theme, type EmojiClickData } from "emoji-picker-react";
+import { useEffect, useRef, useState } from "react";
 import socket from "../../lib/socket";
 
 import { cn } from "@/lib/utils";
@@ -87,15 +92,33 @@ function MessageBubble({ message, chat }: { message: Message; chat: ChatItem }) 
         className={cn(
           "max-w-[75%] px-4 py-3 sm:max-w-[60%]",
           mine
-            ? "rounded-2xl rounded-br-md bg-indigo-600 text-white"
+            ? "rounded-2xl rounded-br-md border border-indigo-200 bg-transparent text-slate-700"
             : "rounded-2xl rounded-bl-md border border-slate-200 bg-white text-slate-700",
         )}
       >
-        {message.text.split("\n").map((line, i) => (
-          <p key={i} className="text-sm leading-relaxed">
-            {line}
-          </p>
-        ))}
+        {message.mediaUrl && message.type === "image" && (
+          <img src={message.mediaUrl} alt={message.caption || message.text} className="max-h-64 rounded-lg object-contain" />
+        )}
+        {message.mediaUrl && message.type === "video" && (
+          <video src={message.mediaUrl} controls className="max-h-64 rounded-lg" />
+        )}
+        {message.mediaUrl && message.type === "audio" && (
+          <audio src={message.mediaUrl} controls className="max-w-full" />
+        )}
+        {message.caption ? (
+          <p className="mt-2 text-sm leading-relaxed">{message.caption}</p>
+        ) : !message.mediaUrl ? (
+          message.text.split("\n").map((line, i) => (
+            <p key={i} className="text-sm leading-relaxed">
+              {line}
+            </p>
+          ))
+        ) : null}
+        {message.mediaUrl && message.type === "file" && (
+          <a href={message.mediaUrl} target="_blank" rel="noreferrer" className="text-sm underline">
+            {message.text}
+          </a>
+        )}
         <div
           className={cn(
             "mt-1.5 flex items-center gap-1 text-[10px]",
@@ -145,24 +168,120 @@ export function ChatThread({
   selectedChat,
   messages,
   draft,
+  selectedFile,
   onDraftChange,
   onSend,
+  onFileChange,
   onBack,
   scrollRef,
 }: {
   selectedChat: ChatItem;
   messages: Message[];
   draft: string;
+  selectedFile: File | null;
   onDraftChange: (value: string) => void;
   onSend: () => void;
+  onFileChange: (file: File | null) => void;
   onBack?: () => void;
   scrollRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const [isOnline, setIsOnline] = useState(false);
   const [last_seen, setlast_seen] = useState<string | null>(null);
+  const [selectedFilePreview, setSelectedFilePreview] = useState<string | null>(null);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
+  const recordingChunksRef = useRef<Blob[]>([]);
 
-  // console.log("ChatThread rendered");
-console.log("Selected chat:", selectedChat);
+  const handleEmojiClick = (emojiData: EmojiClickData) => {
+    onDraftChange(`${draft}${emojiData.emoji}`);
+    setEmojiPickerOpen(false);
+  };
+
+  const toggleVoiceRecording = async () => {
+    if (isRecording) {
+      mediaRecorderRef.current?.stop();
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      console.error("Voice recording is not supported by this browser");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+
+      recordingStreamRef.current = stream;
+      mediaRecorderRef.current = recorder;
+      recordingChunksRef.current = [];
+      setRecordingSeconds(0);
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          recordingChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const mimeType = recorder.mimeType || "audio/webm";
+        const extension = mimeType.includes("mp4") ? "m4a" : "webm";
+        const audioFile = new File(
+          [new Blob(recordingChunksRef.current, { type: mimeType })],
+          `voice-${Date.now()}.${extension}`,
+          { type: mimeType },
+        );
+
+        onFileChange(audioFile);
+        recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+        recordingStreamRef.current = null;
+        mediaRecorderRef.current = null;
+        recordingChunksRef.current = [];
+        setIsRecording(false);
+        setRecordingSeconds(0);
+      };
+
+      recorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error("Unable to access microphone", error);
+    }
+  };
+
+  useEffect(() => {
+    if (!isRecording) return;
+
+    const timer = window.setInterval(() => {
+      setRecordingSeconds((seconds) => seconds + 1);
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [isRecording]);
+
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current?.state === "recording") {
+        mediaRecorderRef.current.stop();
+      }
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedFile) {
+      setSelectedFilePreview(null);
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(selectedFile);
+    setSelectedFilePreview(previewUrl);
+
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [selectedFile]);
+
 
 
   useEffect(() => {
@@ -240,6 +359,25 @@ console.log("Selected chat:", selectedChat);
     socket.off("user:offline", handleOffline);
   };
   }, [selectedChat]);
+
+  useEffect(() => {
+    const chatId = String(selectedChat.id);
+
+    const joinChat = () => {
+      socket.emit("join:chat", chatId);
+    };
+
+    socket.on("connect", joinChat);
+
+    if (socket.connected) {
+      joinChat();
+    }
+
+    return () => {
+      socket.off("connect", joinChat);
+    };
+  }, [selectedChat.id]);
+
   const displayOnline = selectedChat.type === "private" ? isOnline : false;
 
   return (
@@ -287,75 +425,221 @@ console.log("Selected chat:", selectedChat);
         </div>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-6">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-6">
         <div className="mx-auto mb-6 w-fit rounded-full border border-slate-200 px-4 py-1 text-[11px] font-medium text-slate-500">
           Today
         </div>
-        <div className="space-y-4">
-          {messages.map((message) => (
-            <MessageBubble key={message.id} message={message} chat={selectedChat} />
-          ))}
-        </div>
+        {messages.length === 0 ? (
+          <div className="flex min-h-[280px] items-center justify-center px-6 text-center">
+            <div className="max-w-sm">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                <Users className="h-6 w-6" />
+              </div>
+              <h3 className="mt-4 text-base font-semibold text-slate-800">
+                Start a conversation
+              </h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-slate-500">
+                Send a message to {selectedChat.userName || selectedChat.name} and start chatting.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {messages.map((message) => (
+              <MessageBubble key={message.id} message={message} chat={selectedChat} />
+            ))}
+          </div>
+        )}
       </div>
 
-      <div className="px-5 pb-5">
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm focus-within:border-indigo-300 focus-within:ring-2 focus-within:ring-indigo-100">
-          <div className="flex items-center gap-2 px-3 pt-2.5">
+      <div className="shrink-0 px-5 pb-5">
+        {selectedFile ? (
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-slate-700">
+              <span className="truncate text-sm font-medium">Preview</span>
+              <button
+                type="button"
+                aria-label="Remove attachment"
+                onClick={() => onFileChange(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-full transition hover:bg-slate-100 hover:text-indigo-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="flex min-h-48 items-center justify-center bg-slate-100 p-4">
+              {selectedFile.type.startsWith("image/") && selectedFilePreview && (
+                <img
+                  src={selectedFilePreview}
+                  alt={selectedFile.name}
+                  className="max-h-64 max-w-full rounded-lg object-contain"
+                />
+              )}
+              {selectedFile.type.startsWith("video/") && selectedFilePreview && (
+                <video
+                  src={selectedFilePreview}
+                  controls
+                  className="max-h-64 max-w-full rounded-lg"
+                />
+              )}
+              {selectedFile.type.startsWith("audio/") && selectedFilePreview && (
+                <audio src={selectedFilePreview} controls className="w-full max-w-sm" />
+              )}
+              {!selectedFile.type.startsWith("image/") &&
+                !selectedFile.type.startsWith("video/") &&
+                !selectedFile.type.startsWith("audio/") && (
+                <div className="flex flex-col items-center gap-2 text-slate-500">
+                  <FileText className="h-12 w-12" />
+                  <span className="max-w-xs truncate text-sm">{selectedFile.name}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 border-t border-slate-200 bg-white px-3 py-3">
+              <input
+                id="chat-file-input"
+                type="file"
+                className="hidden"
+                onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
+              />
+              <button
+                aria-label="Add another attachment"
+                type="button"
+                onClick={() => document.getElementById("chat-file-input")?.click()}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-100 hover:text-indigo-600"
+              >
+                <Plus className="h-5 w-5" />
+              </button>
+              <div className="flex flex-1 items-center rounded-2xl border border-slate-200 bg-slate-50 px-3">
+                <textarea
+                  value={draft}
+                  onChange={(event) => onDraftChange(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                      event.preventDefault();
+                      onSend();
+                    }
+                  }}
+                  placeholder="Type a message..."
+                  rows={1}
+                  className="max-h-24 min-h-9 w-full resize-none bg-transparent py-2 text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                />
+                <div className="relative shrink-0">
+                  {emojiPickerOpen && (
+                    <div className="absolute right-0 bottom-10 z-20">
+                      <EmojiPicker
+                        onEmojiClick={handleEmojiClick}
+                        theme={Theme.LIGHT}
+                        width={300}
+                        height={360}
+                      />
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    aria-label="Open emoji picker"
+                    onClick={() => setEmojiPickerOpen((open) => !open)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-indigo-600"
+                  >
+                    <Smile className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+              <button
+                type="button"
+                aria-label="Send media"
+                onClick={onSend}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white transition hover:bg-indigo-700"
+              >
+                <Send className="ml-0.5 h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-3xl border border-slate-200 bg-white px-3 py-2 shadow-sm transition focus-within:border-indigo-300 focus-within:ring-2 focus-within:ring-indigo-100">
+            <div className="flex items-end gap-2">
+            <input
+              id="chat-file-input"
+              type="file"
+              className="hidden"
+              onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
+            />
             <button
               aria-label="Attach file"
+              type="button"
+              onClick={() => document.getElementById("chat-file-input")?.click()}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-indigo-600"
             >
-              <Paperclip className="h-3 w-3" />
+              <Paperclip className="h-4 w-4" />
             </button>
             <textarea
               value={draft}
               onChange={(event) => onDraftChange(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
+                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                   event.preventDefault();
                   onSend();
                 }
               }}
-              placeholder={`Message ${selectedChat.name.split(" ")[0]}...`}
               rows={1}
-              className="max-h-32 w-full resize-none bg-transparent py-2 text-sm text-slate-700 outline-none placeholder:text-slate-400"
+              className="max-h-32 min-h-8 flex-1 resize-none bg-transparent py-1.5 text-sm leading-5 text-slate-700 outline-none placeholder:text-slate-400"
             />
+            <div className="relative shrink-0">
+              {emojiPickerOpen && (
+                <div className="absolute right-0 bottom-10 z-20">
+                  <EmojiPicker
+                    onEmojiClick={handleEmojiClick}
+                    theme={Theme.LIGHT}
+                    width={300}
+                    height={360}
+                  />
+                </div>
+              )}
+              <button
+                type="button"
+                aria-label="Open emoji picker"
+                onClick={() => setEmojiPickerOpen((open) => !open)}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-indigo-600"
+              >
+                <Smile className="h-5 w-5" />
+              </button>
+            </div>
             <button
               aria-label="Voice message"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-indigo-600"
+              type="button"
+              onClick={toggleVoiceRecording}
+              className={cn(
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition",
+                isRecording
+                  ? "animate-pulse bg-rose-100 text-rose-600"
+                  : "text-slate-400 hover:bg-slate-100 hover:text-indigo-600",
+              )}
             >
-              <Mic className="h-4 w-4" />
+              {isRecording ? (
+                <span className="text-[10px] font-semibold">{recordingSeconds}s</span>
+              ) : (
+                <Mic className="h-4 w-4" />
+              )}
             </button>
             <button
+              type="button"
+              aria-label="Send message"
               onClick={onSend}
               disabled={!draft.trim()}
               className={cn(
-                "flex h-8 shrink-0 items-center gap-1.5 rounded-xl px-3 text-sm font-medium transition",
+                "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white transition",
                 draft.trim()
-                  ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                  : "cursor-not-allowed bg-indigo-600/50 text-white",
+                  ? "bg-indigo-600 hover:bg-indigo-700"
+                  : "cursor-not-allowed bg-indigo-300",
               )}
             >
-              Send
-              <Send className="h-3 w-3" />
+              <Send className="ml-0.5 h-4 w-4" />
             </button>
+            </div>
+            <div className="flex items-center justify-between px-1 pt-1">
+            </div>
           </div>
-          <div className="flex items-center justify-between px-4 pb-2.5 pt-1">
-            {/* <p className="text-[11px] text-slate-400">
-              Press Enter to send, Shift + Enter for a new line
-            </p> */}
-            {displayOnline && (
-              <p className="flex items-center gap-1 text-[11px] text-slate-400">
-                {selectedChat.name.split(" ")[0]} is typing...
-                <span className="flex gap-0.5">
-                  <span className="h-1 w-1 animate-bounce rounded-full bg-slate-400 [animation-delay:0ms]" />
-                  <span className="h-1 w-1 animate-bounce rounded-full bg-slate-400 [animation-delay:150ms]" />
-                  <span className="h-1 w-1 animate-bounce rounded-full bg-slate-400 [animation-delay:300ms]" />
-                </span>
-              </p>
-            )}
-          </div>
-        </div>
+        )}
       </div>
     </section>
   );
