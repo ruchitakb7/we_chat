@@ -15,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 import EmojiPicker, { Theme, type EmojiClickData } from "emoji-picker-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import socket from "../../lib/socket";
 
 import { cn } from "@/lib/utils";
@@ -191,9 +191,111 @@ export function ChatThread({
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [isPeerTyping, setIsPeerTyping] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingStreamRef = useRef<MediaStream | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
+  const typingTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const peerTypingTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const isTypingRef = useRef(false);
+
+  const stopTyping = () => {
+    if (!isTypingRef.current) return;
+
+    isTypingRef.current = false;
+    console.log("User stopped typing", { chatId: selectedChat.id });
+    socket.emit("stop-typing", { chatId: selectedChat.id });
+  };
+
+  const handleTyping = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    onDraftChange(event.target.value);
+
+    if (!isTypingRef.current) {
+      isTypingRef.current = true;
+      console.log("User started typing", { chatId: selectedChat.id });
+      socket.emit("typing", { chatId: selectedChat.id });
+    }
+
+    if (typingTimerRef.current) {
+      window.clearTimeout(typingTimerRef.current);
+    }
+
+    typingTimerRef.current = window.setTimeout(() => {
+      stopTyping();
+      typingTimerRef.current = null;
+    }, 1500);
+  };
+
+  useEffect(() => {
+    const chatId = String(selectedChat.id);
+    const getTypingChatId = (payload: unknown) => {
+      if (typeof payload === "string" || typeof payload === "number") {
+        return String(payload);
+      }
+
+      if (payload && typeof payload === "object") {
+        const data = payload as { chatId?: string | number; chat_id?: string | number };
+        return String(data.chatId ?? data.chat_id ?? "");
+      }
+
+      return "";
+    };
+
+    const handleUserTyping = (payload: unknown) => {
+      console.log("Received user:typing event", payload);
+      if (getTypingChatId(payload) === chatId) {
+        console.log("Other user is typing", payload);
+        setIsPeerTyping(true);
+
+        if (peerTypingTimerRef.current) {
+          window.clearTimeout(peerTypingTimerRef.current);
+        }
+
+        peerTypingTimerRef.current = window.setTimeout(() => {
+          setIsPeerTyping(false);
+          peerTypingTimerRef.current = null;
+        }, 2000);
+      }
+    };
+
+    const handleUserStopTyping = (payload: unknown) => {
+      console.log("Received user:stop-typing event", payload);
+      if (getTypingChatId(payload) === chatId) {
+        console.log("Other user stopped typing", payload);
+        setIsPeerTyping(false);
+        if (peerTypingTimerRef.current) {
+          window.clearTimeout(peerTypingTimerRef.current);
+          peerTypingTimerRef.current = null;
+        }
+      }
+    };
+
+    const handleAnySocketEvent = (eventName: string, ...args: unknown[]) => {
+      if (eventName.toLowerCase().includes("typ")) {
+        console.log("Received typing-related socket event", eventName, args);
+      }
+    };
+
+    socket.on("typing", handleUserTyping);
+    socket.on("stop-typing", handleUserStopTyping);
+    socket.onAny(handleAnySocketEvent);
+
+    return () => {
+      socket.off("typing", handleUserTyping);
+      socket.off("stop-typing", handleUserStopTyping);
+      socket.offAny(handleAnySocketEvent);
+      if (typingTimerRef.current) {
+        window.clearTimeout(typingTimerRef.current);
+        typingTimerRef.current = null;
+      }
+      if (peerTypingTimerRef.current) {
+        window.clearTimeout(peerTypingTimerRef.current);
+        peerTypingTimerRef.current = null;
+      }
+      stopTyping();
+      setIsPeerTyping(false);
+    };
+  }, [selectedChat.id]);
 
   const handleEmojiClick = (emojiData: EmojiClickData) => {
     onDraftChange(`${draft}${emojiData.emoji}`);
@@ -313,10 +415,10 @@ export function ChatThread({
     last_seen?:Date | null;
   }) => {
     if (userId === targetUserId) {
-      console.log(
-        `User ${userId} is ${isOnline ? "online" : "offline"}`,
-        isOnline ? "" : `Last seen: ${last_seen ?? "unavailable"}`,
-      );
+      // console.log(
+      //   `User ${userId} is ${isOnline ? "online" : "offline"}`,
+      //   isOnline ? "" : `Last seen: ${last_seen ?? "unavailable"}`,
+      // );
       setIsOnline(isOnline);
       setlast_seen(isOnline ? null : last_seen ? String(last_seen) : null);
     }
@@ -401,7 +503,7 @@ export function ChatThread({
 
             {selectedChat.type === "private" && (
               <p className="text-xs text-slate-500">
-                {isOnline ? "Online" : formatLastSeen(last_seen)}
+                {isPeerTyping ? "Typing..." : isOnline ? "Online" : formatLastSeen(last_seen)}
               </p>
             )}
           </div>
@@ -453,6 +555,11 @@ export function ChatThread({
       </div>
 
       <div className="shrink-0 px-5 pb-5">
+        {isPeerTyping && (
+          <p className="mb-2 px-1 text-sm font-medium text-indigo-600" aria-live="polite">
+            Typing...
+          </p>
+        )}
         {selectedFile ? (
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-slate-700">
@@ -513,7 +620,7 @@ export function ChatThread({
               <div className="flex flex-1 items-center rounded-2xl border border-slate-200 bg-slate-50 px-3">
                 <textarea
                   value={draft}
-                  onChange={(event) => onDraftChange(event.target.value)}
+                  onChange={handleTyping}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                       event.preventDefault();
@@ -574,7 +681,7 @@ export function ChatThread({
             </button>
             <textarea
               value={draft}
-              onChange={(event) => onDraftChange(event.target.value)}
+              onChange={handleTyping}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                   event.preventDefault();

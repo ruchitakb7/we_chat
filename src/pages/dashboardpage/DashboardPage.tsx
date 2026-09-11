@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Menu, MessageSquareText, Phone, Settings, SquarePen, UserRound } from "lucide-react";
+import { Menu, MessageSquareText, Settings, SquarePen, UserRound } from "lucide-react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
@@ -79,7 +79,28 @@ function DashboardPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const wasDesktopRef = useRef(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const desktopQuery = window.matchMedia("(min-width: 1024px)");
+    wasDesktopRef.current = desktopQuery.matches;
+
+    const handleViewportChange = (event: MediaQueryListEvent) => {
+      if (event.matches) {
+        wasDesktopRef.current = true;
+        return;
+      }
+
+      if (wasDesktopRef.current && (selectedChatId || chatList.length > 0)) {
+        setMobileThreadOpen(true);
+      }
+      wasDesktopRef.current = false;
+    };
+
+    desktopQuery.addEventListener("change", handleViewportChange);
+    return () => desktopQuery.removeEventListener("change", handleViewportChange);
+  }, [chatList.length, selectedChatId]);
 
   useEffect(() => {
     const privateChat = location.state?.privateChat;
@@ -122,6 +143,14 @@ function DashboardPage() {
     () => chatList.find((chat) => chat.id === selectedChatId) ?? chatList[0],
     [chatList, selectedChatId],
   );
+
+  useEffect(() => {
+    if (!selectedChat || window.matchMedia("(min-width: 1024px)").matches) {
+      return;
+    }
+
+    setMobileThreadOpen(true);
+  }, [selectedChat?.id]);
 
   useEffect(() => {
     const chatId = selectedChat ? Number(selectedChat.id) : NaN;
@@ -364,7 +393,7 @@ function DashboardPage() {
             <nav className="flex items-center justify-around border-t border-slate-200 px-4 py-2">
               {[
                 { label: "Chats", active: true, path: "/chats", icon: MessageSquareText },
-                { label: "Calls", active: false, path: "/calls", icon: Phone },
+                // { label: "Calls", active: false, path: "/calls", icon: Phone },
                 { label: "People", active: false, path: "/people", icon: UserRound },
                 { label: "Settings", active: false, path: "/settings", icon: Settings },
               ].map(({ label, active, path, icon: Icon }) => (
