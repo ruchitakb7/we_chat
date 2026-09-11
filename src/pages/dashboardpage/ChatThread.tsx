@@ -173,6 +173,7 @@ export function ChatThread({
   onSend,
   onFileChange,
   onBack,
+  onOpenDetails,
   scrollRef,
 }: {
   selectedChat: ChatItem;
@@ -183,6 +184,7 @@ export function ChatThread({
   onSend: () => void;
   onFileChange: (file: File | null) => void;
   onBack?: () => void;
+  onOpenDetails?: () => void;
   scrollRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const [isOnline, setIsOnline] = useState(false);
@@ -482,12 +484,18 @@ export function ChatThread({
 
   const displayOnline = selectedChat.type === "private" ? isOnline : false;
 
+
   return (
     <section className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-white">
       <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
-        <div className="flex items-center gap-3">
+          <div
+            onClick={onOpenDetails}
+            className="flex items-center gap-3 text-left transition-opacity hover:opacity-80"
+            aria-label="Open chat details"
+          >
           <button
             onClick={onBack}
+            onClickCapture={(event) => event.stopPropagation()}
             className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 lg:hidden"
             aria-label="Back to chats"
           >
@@ -519,6 +527,7 @@ export function ChatThread({
             <button
               key={label}
               aria-label={label}
+              onClick={label === "More options" ? onOpenDetails : undefined}
               className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-indigo-600"
             >
               <Icon className="h-[18px] w-[18px]" />

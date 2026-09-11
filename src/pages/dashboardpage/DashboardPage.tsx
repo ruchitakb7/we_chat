@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { ChatSidebar, ChatSidebarHeader } from "./ChatSidebar";
 import { ChatSidebarFooter } from "./chatSidebarfooter";
 import { ChatThread } from "./ChatThread";
+import { ChatDetailsPanel } from "./ChatDetailsPanel";
 import type { ChatItem, Message, User } from "./types";
 import { useChats } from "./useChats";
 import { createMessage, getMessages } from "@/service/messageservice";
@@ -78,6 +79,7 @@ function DashboardPage() {
   const [query, setQuery] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const wasDesktopRef = useRef(false);
   const navigate = useNavigate();
@@ -319,16 +321,25 @@ function DashboardPage() {
           </div>
 
           {selectedChat ? (
-            <ChatThread
-              selectedChat={selectedChat}
-              messages={messages}
-              draft={draft}
-              selectedFile={selectedFile}
-              onDraftChange={setDraft}
-              onSend={sendMessage}
-              onFileChange={setSelectedFile}
-              scrollRef={scrollRef}
-            />
+            detailsOpen ? (
+              <ChatDetailsPanel
+                chat={selectedChat}
+                currentUserId={currentUser?.id}
+                onBack={() => setDetailsOpen(false)}
+              />
+            ) : (
+              <ChatThread
+                selectedChat={selectedChat}
+                messages={messages}
+                draft={draft}
+                selectedFile={selectedFile}
+                onDraftChange={setDraft}
+                onSend={sendMessage}
+                onFileChange={setSelectedFile}
+                onOpenDetails={() => setDetailsOpen(true)}
+                scrollRef={scrollRef}
+              />
+            )
           ) : (
             <section className="flex min-w-0 flex-1 items-center justify-center bg-slate-50 px-6 text-center">
               <div>
@@ -345,17 +356,26 @@ function DashboardPage() {
       <div className="flex h-dvh flex-col bg-white lg:hidden">
         {mobileThreadOpen && selectedChat ? (
           <div className="h-full min-h-0 flex-1">
-            <ChatThread
-              selectedChat={selectedChat}
-              messages={messages}
-              draft={draft}
-              selectedFile={selectedFile}
-              onDraftChange={setDraft}
-              onFileChange={setSelectedFile}
-              onSend={sendMessage}
-              onBack={() => setMobileThreadOpen(false)}
-              scrollRef={scrollRef}
-            />
+            {detailsOpen ? (
+              <ChatDetailsPanel
+                chat={selectedChat}
+                currentUserId={currentUser?.id}
+                onBack={() => setDetailsOpen(false)}
+              />
+            ) : (
+              <ChatThread
+                selectedChat={selectedChat}
+                messages={messages}
+                draft={draft}
+                selectedFile={selectedFile}
+                onDraftChange={setDraft}
+                onFileChange={setSelectedFile}
+                onSend={sendMessage}
+                onBack={() => setMobileThreadOpen(false)}
+                onOpenDetails={() => setDetailsOpen(true)}
+                scrollRef={scrollRef}
+              />
+            )}
           </div>
         ) : (
           <>

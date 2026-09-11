@@ -55,3 +55,19 @@ export const createGroupChat = async (
 
     return response.data;
 };
+
+
+export const getChatDetails = async (chatId: number) => 
+  { const response = await api.get(`/chat/${chatId}/details`); 
+return response.data; 
+};
+
+export const addChatMember = async (chatId: number, userId: string | number) => {
+  const response = await api.post(`/chat/${chatId}/members`, { userId });
+  return response.data;
+};
+
+export const removeChatMember = async (chatId: number, userId: string) => {
+  const response = await api.delete(`/chat/${chatId}/members/${userId}`);
+  return response.data;
+};
