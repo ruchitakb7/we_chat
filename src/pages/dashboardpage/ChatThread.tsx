@@ -1,6 +1,5 @@
 import {
   ArrowLeft,
-  CheckCheck,
   FileText,
   MoreVertical,
   Paperclip,
@@ -20,149 +19,13 @@ import socket from "../../lib/socket";
 
 import { cn } from "@/lib/utils";
 import type { ChatItem, Message } from "./types";
-
-function ChatAvatar({
-  chat,
-  size = "md",
-  online,
-}: {
-  chat: ChatItem;
-  size?: "md" | "lg";
-  online?: boolean;
-}) {
-  const dim = size === "md" ? "h-12 w-12" : "h-11 w-11";
-
-  return (
-    <div className="relative shrink-0">
-      {chat.group ? (
-        <div
-          className={cn(
-            "flex items-center justify-center rounded-full text-white",
-            dim,
-            chat.groupColor,
-          )}
-        >
-          <Users className="h-5 w-5" />
-        </div>
-      ) : (
-        <div className={cn("overflow-hidden rounded-full", dim)}>
-          <img
-            src={chat.avatar}
-            alt={chat.name}
-            className="h-full w-full object-cover"
-            loading="lazy"
-          />
-        </div>
-      )}
-      {(online ?? chat.online) && (
-        <span className="absolute right-0 bottom-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
-      )}
-    </div>
-  );
-}
-
-function MessageBubble({ message, chat }: { message: Message; chat: ChatItem }) {
-  const mine = message.sender === "me";
-
-  return (
-    <div className={cn("flex items-end gap-2.5", mine ? "justify-end" : "justify-start")}>
-      {!mine && (
-        <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full">
-          {chat.group ? (
-            <div
-              className={cn(
-                "flex h-full w-full items-center justify-center text-white",
-                chat.groupColor,
-              )}
-            >
-              <Users className="h-4 w-4" />
-            </div>
-          ) : (
-            <img
-              src={chat.avatar}
-              alt={chat.name}
-              className="h-full w-full object-cover"
-              loading="lazy"
-            />
-          )}
-        </div>
-      )}
-
-      <div
-        className={cn(
-          "max-w-[75%] px-4 py-3 sm:max-w-[60%]",
-          mine
-            ? "rounded-2xl rounded-br-md border border-indigo-200 bg-transparent text-slate-700"
-            : "rounded-2xl rounded-bl-md border border-slate-200 bg-white text-slate-700",
-        )}
-      >
-        {message.mediaUrl && message.type === "image" && (
-          <img src={message.mediaUrl} alt={message.caption || message.text} className="max-h-64 rounded-lg object-contain" />
-        )}
-        {message.mediaUrl && message.type === "video" && (
-          <video src={message.mediaUrl} controls className="max-h-64 rounded-lg" />
-        )}
-        {message.mediaUrl && message.type === "audio" && (
-          <audio src={message.mediaUrl} controls className="max-w-full" />
-        )}
-        {message.caption ? (
-          <p className="mt-2 text-sm leading-relaxed">{message.caption}</p>
-        ) : !message.mediaUrl ? (
-          message.text.split("\n").map((line, i) => (
-            <p key={i} className="text-sm leading-relaxed">
-              {line}
-            </p>
-          ))
-        ) : null}
-        {message.mediaUrl && message.type === "file" && (
-          <a href={message.mediaUrl} target="_blank" rel="noreferrer" className="text-sm underline">
-            {message.text}
-          </a>
-        )}
-        <div
-          className={cn(
-            "mt-1.5 flex items-center gap-1 text-[10px]",
-            mine ? "justify-end text-indigo-200" : "text-slate-400",
-          )}
-        >
-          <span>{message.time}</span>
-          {mine && <CheckCheck className="h-3.5 w-3.5" />}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function formatLastSeen(last_seen: string | Date | null | undefined) {
-  if (!last_seen) {
-    return "Last seen unavailable";
-  }
-
-  const elapsedMinutes = Math.floor(
-    (Date.now() - new Date(last_seen).getTime()) / 60000,
-  );
-
-  if (Number.isNaN(elapsedMinutes)) {
-    return "Last seen unavailable";
-  }
-
-  if (elapsedMinutes < 1) {
-    return "Last seen just now";
-  }
-
-  if (elapsedMinutes < 60) {
-    return `Last seen ${elapsedMinutes} min ago`;
-  }
-
-  const elapsedHours = Math.floor(elapsedMinutes / 60);
-
-  if (elapsedHours < 24) {
-    return `Last seen ${elapsedHours} ${elapsedHours === 1 ? "hour" : "hours"} ago`;
-  }
-
-  const elapsedDays = Math.floor(elapsedHours / 24);
-  return `Last seen ${elapsedDays} ${elapsedDays === 1 ? "day" : "days"} ago`;
-}
+import {
+  ChatAvatar,
+  formatLastSeen,
+  formatMessageDay,
+  getMessageDayKey,
+  MessageBubble,
+} from "./chatthreadfunction";
 
 export function ChatThread({
   selectedChat,
@@ -194,6 +57,8 @@ export function ChatThread({
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [isPeerTyping, setIsPeerTyping] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingStreamRef = useRef<MediaStream | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
@@ -483,6 +348,12 @@ export function ChatThread({
   }, [selectedChat.id]);
 
   const displayOnline = selectedChat.type === "private" ? isOnline : false;
+  const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase();
+  const visibleMessages = normalizedSearchQuery
+    ? messages.filter((message) =>
+      `${message.text} ${message.caption ?? ""}`.toLocaleLowerCase().includes(normalizedSearchQuery),
+    )
+    : messages;
 
 
   return (
@@ -518,16 +389,42 @@ export function ChatThread({
         </div>
 
         <div className="flex items-center gap-1">
+          {searchOpen && (
+            <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2">
+              <input
+                autoFocus
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search messages"
+                aria-label="Search messages"
+                className="w-32 bg-transparent py-1.5 text-sm text-slate-700 outline-none placeholder:text-slate-400"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  aria-label="Clear message search"
+                  onClick={() => setSearchQuery("")}
+                  className="flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          )}
           {[
             { icon: Search, label: "Search in chat" },
-            { icon: Phone, label: "Voice call" },
+            // { icon: Phone, label: "Voice call" },
             { icon: Video, label: "Video call" },
             { icon: MoreVertical, label: "More options" },
           ].map(({ icon: Icon, label }) => (
             <button
               key={label}
               aria-label={label}
-              onClick={label === "More options" ? onOpenDetails : undefined}
+              onClick={label === "Search in chat"
+                ? () => setSearchOpen((open) => !open)
+                : label === "More options"
+                  ? onOpenDetails
+                  : undefined}
               className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-indigo-600"
             >
               <Icon className="h-[18px] w-[18px]" />
@@ -537,9 +434,6 @@ export function ChatThread({
       </div>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-6">
-        <div className="mx-auto mb-6 w-fit rounded-full border border-slate-200 px-4 py-1 text-[11px] font-medium text-slate-500">
-          Today
-        </div>
         {messages.length === 0 ? (
           <div className="flex min-h-[280px] items-center justify-center px-6 text-center">
             <div className="max-w-sm">
@@ -554,11 +448,28 @@ export function ChatThread({
               </p>
             </div>
           </div>
+        ) : visibleMessages.length === 0 ? (
+          <div className="flex min-h-[280px] items-center justify-center px-6 text-center text-sm text-slate-500">
+            No messages match “{searchQuery}”.
+          </div>
         ) : (
           <div className="space-y-4">
-            {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} chat={selectedChat} />
-            ))}
+            {visibleMessages.map((message, index) => {
+              const dayKey = getMessageDayKey(message);
+              const previousDayKey = index > 0 ? getMessageDayKey(visibleMessages[index - 1]) : null;
+              const showDay = dayKey && dayKey !== previousDayKey;
+
+              return (
+                <div key={message.id}>
+                  {showDay && (
+                    <div className="mx-auto mb-4 w-fit rounded-full border border-slate-200 px-4 py-1 text-[11px] font-medium text-slate-500">
+                      {formatMessageDay(dayKey)}
+                    </div>
+                  )}
+                  <MessageBubble message={message} chat={selectedChat} searchQuery={searchQuery} />
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

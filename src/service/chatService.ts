@@ -26,10 +26,13 @@ export interface UserChat {
   id: number;
   type: "private" | "group";
   name?: string | null;
+  profileimg?: string | null;
+  grpprofile?: string | null;
   user?: {
     id: string;
     username: string;
     fullName: string | null;
+    profileimg?: string | null;
   };
   userId?: string | null;
   createdAt: string;
@@ -62,17 +65,14 @@ export const getChatDetails = async (chatId: number) =>
 return response.data; 
 };
 
-export const addChatMember = async (chatId: number, userId: string | number) => {
-  const response = await api.post(`/chat/${chatId}/members`, { userId });
-  return response.data;
-};
+export const updateGroupDetails = async (
+  chatId: number,
+  data: {
+    name?: string;
+    grpprofile?: string;
+  }
+) => {
+  const response = await api.patch(`/chat/${chatId}`, data);
 
-export const removeChatMember = async (chatId: number, userId: string) => {
-  const response = await api.delete(`/chat/${chatId}/members/${userId}`);
   return response.data;
-};
-
-export const promoteChatMember = async (chatId: number, userId: string) => {
-  const response = await api.patch(`/chat/${chatId}/members/${userId}/role`, { role: "admin" });
-  return response.data;
-};
+};;

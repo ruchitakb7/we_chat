@@ -14,7 +14,16 @@ function ChatAvatar({
 
   return (
     <div className="relative shrink-0">
-      {chat.group ? (
+      {chat.group && chat.profileimg ? (
+        <div className={cn("overflow-hidden rounded-full", dim)}>
+          <img
+            src={chat.avatar}
+            alt={chat.name}
+            className="h-full w-full object-cover"
+            loading="lazy"
+          />
+        </div>
+      ) : chat.group ? (
         <div
           className={cn(
             "flex items-center justify-center rounded-full text-white",
@@ -27,7 +36,7 @@ function ChatAvatar({
       ) : (
         <div className={cn("overflow-hidden rounded-full", dim)}>
           <img
-            src={chat.name ? `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.name)}&background=4f46e5&color=fff` : chat.avatar}
+            src={chat.avatar}
             alt={chat.name}
             className="h-full w-full object-cover"
             loading="lazy"
@@ -165,7 +174,7 @@ export function ChatSidebarList({
   selectedChatId,
   query,
   onSelectChat,
-  onNewChat,
+  // onNewChat,
 }: {
   chats: ChatItem[];
   selectedChatId: string;
@@ -183,13 +192,13 @@ export function ChatSidebarList({
     <>
       <div className="flex items-center justify-between px-5 pt-4 pb-1">
         <h2 className="text-sm font-medium text-slate-500">Chats</h2>
-        <button
+        {/* <button
           aria-label="New chat"
           onClick={onNewChat}
           className="flex h-7 w-7 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-indigo-600"
         >
           <Plus className="h-4 w-4" />
-        </button>
+        </button> */}
       </div>
 
       <div className="flex-1 space-y-0.5 overflow-y-auto px-2.5 pb-2">

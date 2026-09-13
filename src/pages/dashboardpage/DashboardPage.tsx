@@ -38,6 +38,26 @@ function mapApiMessage(rawMessage: RawMessage, currentUserId?: string): Message 
     : "text";
   const createdAt = rawMessage.createdAt ?? rawMessage.created_at;
   const senderId = String(rawMessage.senderId ?? rawMessage.sender_id ?? "");
+  const senderUsername = typeof rawMessage.senderUsername === "string"
+    ? rawMessage.senderUsername
+    : typeof rawMessage.sender_username === "string"
+      ? rawMessage.sender_username
+      : undefined;
+  const senderProfileImage = typeof rawMessage.profileimg === "string"
+    ? getUploadedFileUrl(rawMessage.profileimg)
+    : undefined;
+  const sender = rawMessage.sender ?? rawMessage.user ?? rawMessage.author;
+  const senderObject = sender && typeof sender === "object" ? sender as RawMessage : undefined;
+  const senderName = [
+    rawMessage.senderName,
+    rawMessage.sender_name,
+    rawMessage.senderUsername,
+    rawMessage.sender_username,
+    senderObject?.fullName,
+    senderObject?.full_name,
+    senderObject?.username,
+    senderObject?.name,
+  ].find((value): value is string => typeof value === "string" && value.trim().length > 0);
   const mediaPath = type === "text" ? undefined : messageText;
   const mediaName = messageText.split("/").pop();
 
@@ -46,6 +66,9 @@ function mapApiMessage(rawMessage: RawMessage, currentUserId?: string): Message 
   return {
     id,
     sender: senderId === currentUserId ? "me" : "them",
+    senderName,
+    senderUsername,
+    senderProfileImage,
     text: type === "text" ? messageText : mediaName ?? type ?? "file",
     time: createdAt
       ? new Date(String(createdAt)).toLocaleTimeString("en-IN", {
@@ -54,6 +77,7 @@ function mapApiMessage(rawMessage: RawMessage, currentUserId?: string): Message 
         minute: "2-digit",
       })
       : "",
+    createdAt: createdAt ? String(createdAt) : undefined,
     type,
     mediaUrl: mediaPath ? getUploadedFileUrl(mediaPath) : undefined,
     caption,
@@ -132,7 +156,12 @@ function DashboardPage() {
       type: privateChat.type,
       unread: 0,
       online: false,
-      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(privateChat.name)}&background=4f46e5&color=fff`,
+      avatar: privateChat.profileimg
+        ? getUploadedFileUrl(privateChat.profileimg)
+        : `https://ui-avatars.com/api/?name=${encodeURIComponent(
+            privateChat.name,
+          )}&background=4f46e5&color=fff`,
+      profileimg: privateChat.profileimg ?? null,
     };
 
     setSelectedChatId(chat.id);

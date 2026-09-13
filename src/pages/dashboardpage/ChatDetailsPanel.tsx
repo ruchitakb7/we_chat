@@ -1,37 +1,12 @@
-import { ArrowLeft, Crown, Search, Trash2, UserPlus, Users, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowLeft, Check, Crown, LogOut, Pencil, Search, Trash2, Upload, UserPlus, Users, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
-import { addChatMember, getChatDetails, promoteChatMember, removeChatMember } from "@/service/chatService";
+import { getChatDetails , updateGroupDetails} from "@/service/chatService";
 import { searchUsers, type SearchUser } from "@/service/authservice";
-import { getUploadedFileUrl } from "@/service/uploadfile";
+import { getUploadedFileUrl, uploadFile } from "@/service/uploadfile";
+import { addChatMember, leaveGroup, removeChatMember, promoteChatMember } from "@/service/chatmemberService";
 import { cn } from "@/lib/utils";
-import type { ChatItem } from "./types";
-
-type ChatMember = {
-  id: string;
-  fullName?: string | null;
-  username: string;
-  profileimg?: string | null;
-  role?: string;
-  joinedAt?: string;
-};
-
-type ChatDetails = {
-  id: string | number;
-  type: "group" | "private";
-  name?: string;
-  grpprofile?: string | null;
-  createdBy?: string;
-  member?: {
-    id: string;
-    fullName?: string | null;
-    username: string;
-    profileimg?: string | null;
-    role?: string;
-    joinedAt?: string;
-  };
-  members?: ChatMember[];
-};
+import type { ChatDetails, ChatItem } from "./types";
 
 export function ChatDetailsPanel({
   chat,
@@ -48,6 +23,11 @@ export function ChatDetailsPanel({
   const [memberResults, setMemberResults] = useState<SearchUser[]>([]);
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [memberActionId, setMemberActionId] = useState<string | null>(null);
+  const [isEditingGroup, setIsEditingGroup] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [groupProfileFile, setGroupProfileFile] = useState<File | null>(null);
+  const [groupProfilePreview, setGroupProfilePreview] = useState<string | null>(null);
+  const groupProfileInputRef = useRef<HTMLInputElement>(null);
   const isGroupChat = details?.type === "group";
   const isAdmin = Boolean(
     details &&
@@ -63,7 +43,9 @@ export function ChatDetailsPanel({
     void getChatDetails(Number(chat.id))
       .then((response) => {
         if (active) {
-          setDetails((response?.data ?? response?.chat ?? response) as ChatDetails);
+          const nextDetails = (response?.data ?? response?.chat ?? response) as ChatDetails;
+          setDetails(nextDetails);
+          setGroupName(nextDetails.name ?? "");
         }
       })
       .catch(() => {
@@ -98,7 +80,33 @@ export function ChatDetailsPanel({
 
   const refreshDetails = async () => {
     const response = await getChatDetails(Number(chat.id));
-    setDetails((response?.data ?? response?.chat ?? response) as ChatDetails);
+    const nextDetails = (response?.data ?? response?.chat ?? response) as ChatDetails;
+    setDetails(nextDetails);
+    setGroupName(nextDetails.name ?? "");
+  };
+
+  const handleGroupProfileChange = (file: File | null) => {
+    setGroupProfileFile(file);
+    setGroupProfilePreview(file ? URL.createObjectURL(file) : null);
+  };
+
+  const handleUpdateGroup = async () => {
+    if (!isAdmin || !groupName.trim()) return;
+
+    setMemberActionId("group-update");
+    try {
+      const uploadedFile = groupProfileFile ? await uploadFile(groupProfileFile) : null;
+      await updateGroupDetails(Number(chat.id), {
+        name: groupName.trim(),
+        ...(uploadedFile ? { grpprofile: uploadedFile.path } : {}),
+      });
+      await refreshDetails();
+      setGroupProfileFile(null);
+      setGroupProfilePreview(null);
+      setIsEditingGroup(false);
+    } finally {
+      setMemberActionId(null);
+    }
   };
 
   const handleAddMember = async (user: SearchUser) => {
@@ -132,6 +140,16 @@ export function ChatDetailsPanel({
     }
   };
 
+  const handleLeaveGroup = async () => {
+    setMemberActionId("leave");
+    try {
+      await leaveGroup(Number(chat.id));
+      window.location.reload()
+    } finally {
+      setMemberActionId(null);
+    }
+  };
+
   return (
     <section className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-white">
       <header className="flex items-center gap-3 border-b border-slate-200 px-5 py-3">
@@ -153,9 +171,40 @@ export function ChatDetailsPanel({
           <div className="mx-auto max-w-lg">
             <div className="flex flex-col items-center border-b border-slate-200 pb-6 text-center">
               {isGroupChat ? (
-                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
-                  <Users className="h-9 w-9" />
-                </div>
+                <>
+                  <input
+                    ref={groupProfileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(event) => handleGroupProfileChange(event.target.files?.[0] ?? null)}
+                  />
+                  <button
+                    type="button"
+                    disabled={!isEditingGroup}
+                    onClick={() => groupProfileInputRef.current?.click()}
+                    className={cn(
+                      "relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-indigo-100 text-indigo-600",
+                      isEditingGroup && "cursor-pointer ring-2 ring-indigo-300",
+                    )}
+                    aria-label="Change group profile picture"
+                  >
+                    {groupProfilePreview || details.grpprofile ? (
+                      <img
+                        src={groupProfilePreview ?? getUploadedFileUrl(details.grpprofile!)}
+                        alt={title}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <Users className="h-9 w-9" />
+                    )}
+                    {isEditingGroup && (
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/40 text-white">
+                        <Upload className="h-5 w-5" />
+                      </span>
+                    )}
+                  </button>
+                </>
               ) : (
                 <img
                   src={details.grpprofile ? getUploadedFileUrl(details.grpprofile) : chat.avatar}
@@ -163,7 +212,56 @@ export function ChatDetailsPanel({
                   className="h-20 w-20 rounded-full object-cover"
                 />
               )}
-              <h3 className="mt-3 text-lg font-semibold text-slate-900">{title}</h3>
+              {isEditingGroup ? (
+                <input
+                  value={groupName}
+                  onChange={(event) => setGroupName(event.target.value)}
+                  className="mt-3 w-full max-w-xs rounded-lg border border-indigo-300 px-3 py-2 text-center text-lg font-semibold text-slate-900 outline-none"
+                  aria-label="Group name"
+                />
+              ) : (
+                <h3 className="mt-3 text-lg font-semibold text-slate-900">{title}</h3>
+              )}
+              {isGroupChat && isAdmin && (
+                <div className="mt-3 flex items-center gap-2">
+                  {isEditingGroup ? (
+                    <>
+                      <button
+                        type="button"
+                        disabled={memberActionId === "group-update" || !groupName.trim()}
+                        onClick={() => void handleUpdateGroup()}
+                        className="flex items-center gap-1 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        disabled={memberActionId === "group-update"}
+                        onClick={() => {
+                          setGroupName(details.name ?? "");
+                          setGroupProfileFile(null);
+                          setGroupProfilePreview(null);
+                          setIsEditingGroup(false);
+                        }}
+                        className="flex items-center gap-1 rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingGroup(true)}
+                      className="flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit profile
+                    </button>
+                  )}
+                </div>
+              )}
               <p className="mt-1 text-sm text-slate-500">
                 {isGroupChat ? `${members.length} members` : "Private chat"}
               </p>
@@ -199,17 +297,22 @@ export function ChatDetailsPanel({
                       {memberResults
                         .filter((user) => !members.some((member) => member.id === String(user.id)))
                         .map((user) => (
-                          <button
+                          <div
                             key={user.id}
-                            type="button"
-                            disabled={memberActionId === String(user.id)}
-                            onClick={() => void handleAddMember(user)}
-                            className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-slate-50 disabled:opacity-50"
+                            className="flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-slate-50"
                           >
-                            <UserPlus className="h-4 w-4 text-indigo-600" />
                             <span className="text-sm text-slate-700">{user.fullName || user.username}</span>
                             <span className="ml-auto text-xs text-slate-400">@{user.username}</span>
-                          </button>
+                            <button
+                              type="button"
+                              disabled={memberActionId === String(user.id)}
+                              onClick={() => void handleAddMember(user)}
+                              className="flex items-center gap-1 rounded-md bg-indigo-600 px-2 py-1 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                            >
+                              <UserPlus className="h-3.5 w-3.5" />
+                              Add member
+                            </button>
+                          </div>
                         ))}
                     </div>
                   </div>
@@ -260,6 +363,15 @@ export function ChatDetailsPanel({
                     </div>
                   ))}
                 </div>
+                <button
+                  type="button"
+                  disabled={memberActionId === "leave"}
+                  onClick={() => void handleLeaveGroup()}
+                  className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50 disabled:opacity-50"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Leave group
+                </button>
               </div>
             ) : (
               <div className="pt-6 space-y-6">
