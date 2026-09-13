@@ -3,7 +3,6 @@ import {
   FileText,
   MoreVertical,
   Paperclip,
-  Phone,
   Plus,
   Search,
   Send,
@@ -355,6 +354,12 @@ export function ChatThread({
     )
     : messages;
 
+  const handleBackClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onBack?.();
+  };
+
 
   return (
     <section className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-white">
@@ -365,8 +370,8 @@ export function ChatThread({
             aria-label="Open chat details"
           >
           <button
-            onClick={onBack}
-            onClickCapture={(event) => event.stopPropagation()}
+            type="button"
+            onClick={handleBackClick}
             className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 lg:hidden"
             aria-label="Back to chats"
           >

@@ -311,6 +311,15 @@ function DashboardPage() {
     setMobileThreadOpen(true);
   };
 
+  const closeChatDetails = () => {
+    setDetailsOpen(false);
+  };
+
+  const closeMobileChat = () => {
+    setDetailsOpen(false);
+    setMobileThreadOpen(false);
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-500">
@@ -354,7 +363,7 @@ function DashboardPage() {
               <ChatDetailsPanel
                 chat={selectedChat}
                 currentUserId={currentUser?.id}
-                onBack={() => setDetailsOpen(false)}
+                onBack={closeChatDetails}
               />
             ) : (
               <ChatThread
@@ -389,7 +398,7 @@ function DashboardPage() {
               <ChatDetailsPanel
                 chat={selectedChat}
                 currentUserId={currentUser?.id}
-                onBack={() => setDetailsOpen(false)}
+                onBack={closeChatDetails}
               />
             ) : (
               <ChatThread
@@ -400,7 +409,7 @@ function DashboardPage() {
                 onDraftChange={setDraft}
                 onFileChange={setSelectedFile}
                 onSend={sendMessage}
-                onBack={() => setMobileThreadOpen(false)}
+                onBack={closeMobileChat}
                 onOpenDetails={() => setDetailsOpen(true)}
                 scrollRef={scrollRef}
               />
