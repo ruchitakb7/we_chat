@@ -1,7 +1,7 @@
 import { ArrowLeft, Crown, Search, Trash2, UserPlus, Users, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { addChatMember, getChatDetails, removeChatMember } from "@/service/chatService";
+import { addChatMember, getChatDetails, promoteChatMember, removeChatMember } from "@/service/chatService";
 import { searchUsers, type SearchUser } from "@/service/authservice";
 import { getUploadedFileUrl } from "@/service/uploadfile";
 import { cn } from "@/lib/utils";
@@ -24,7 +24,11 @@ type ChatDetails = {
   createdBy?: string;
   member?: {
     id: string;
+    fullName?: string | null;
     username: string;
+    profileimg?: string | null;
+    role?: string;
+    joinedAt?: string;
   };
   members?: ChatMember[];
 };
@@ -47,8 +51,8 @@ export function ChatDetailsPanel({
   const isGroupChat = details?.type === "group";
   const isAdmin = Boolean(
     details &&
-      (details.createdBy === currentUserId ||
-        details.members?.some((member) => member.id === currentUserId && member.role === "admin")),
+    (details.createdBy === currentUserId ||
+      details.members?.some((member) => member.id === currentUserId && member.role === "admin")),
   );
 
   useEffect(() => {
@@ -112,6 +116,16 @@ export function ChatDetailsPanel({
     setMemberActionId(memberId);
     try {
       await removeChatMember(Number(chat.id), memberId);
+      await refreshDetails();
+    } finally {
+      setMemberActionId(null);
+    }
+  };
+
+  const handlePromoteMember = async (memberId: string) => {
+    setMemberActionId(memberId);
+    try {
+      await promoteChatMember(Number(chat.id), memberId);
       await refreshDetails();
     } finally {
       setMemberActionId(null);
@@ -220,6 +234,18 @@ export function ChatDetailsPanel({
                           {member.role}
                         </span>
                       )}
+                      {isAdmin && member.id !== currentUserId && member.role !== "admin" && (
+                        <button
+                          type="button"
+                          aria-label={`Make ${member.username} an admin`}
+                          title="Make admin"
+                          disabled={memberActionId === member.id}
+                          onClick={() => void handlePromoteMember(member.id)}
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 disabled:opacity-50"
+                        >
+                          <Crown className="h-4 w-4" />
+                        </button>
+                      )}
                       {isAdmin && member.id !== currentUserId && (
                         <button
                           type="button"
@@ -236,10 +262,89 @@ export function ChatDetailsPanel({
                 </div>
               </div>
             ) : (
-              <div className="pt-6 text-sm text-slate-600">
-                <p><span className="font-medium">Username:</span> {details.member?.username ?? chat.name}</p>
-                <p className="mt-2"><span className="font-medium">User ID:</span> {details.member?.id ?? chat.userId ?? "Unavailable"}</p>
+              <div className="pt-6 space-y-6">
+                <div>
+                  <h4 className="mb-3 text-sm font-semibold text-slate-700">
+                    Conversation
+                  </h4>
+
+                  <div className="rounded-xl border border-slate-200 overflow-hidden">
+
+                    {/* Mute */}
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50"
+                    >
+                      <span className="text-lg">🔕</span>
+
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">
+                          Mute notifications
+                        </p>
+
+                        <p className="text-xs text-slate-400">
+                          Turn off notifications for this chat
+                        </p>
+                      </div>
+                    </button>
+
+                    <div className="border-t border-slate-100" />
+
+                  </div>
+                </div>
+
+                {/* Danger Zone */}
+                <div>
+                  <h4 className="mb-3 text-sm font-semibold text-slate-700">
+                    Actions
+                  </h4>
+
+                  <div className="rounded-xl border border-slate-200 overflow-hidden">
+
+                    {/* Block */}
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-rose-50"
+                    >
+                      <span className="text-lg">🚫</span>
+
+                      <div>
+                        <p className="text-sm font-medium text-rose-600">
+                          Block user
+                        </p>
+
+                        <p className="text-xs text-slate-400">
+                          Prevent this user from contacting you
+                        </p>
+                      </div>
+                    </button>
+
+                    <div className="border-t border-slate-100" />
+
+                    {/* Delete */}
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-rose-50"
+                    >
+                      <Trash2 className="h-4 w-4 text-rose-500" />
+
+                      <div>
+                        <p className="text-sm font-medium text-rose-600">
+                          Delete conversation
+                        </p>
+
+                        <p className="text-xs text-slate-400">
+                          Remove this conversation from your chats
+                        </p>
+                      </div>
+                    </button>
+
+                  </div>
+                </div>
+
               </div>
+
+
             )}
           </div>
         )}

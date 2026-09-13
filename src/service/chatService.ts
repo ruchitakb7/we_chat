@@ -71,3 +71,8 @@ export const removeChatMember = async (chatId: number, userId: string) => {
   const response = await api.delete(`/chat/${chatId}/members/${userId}`);
   return response.data;
 };
+
+export const promoteChatMember = async (chatId: number, userId: string) => {
+  const response = await api.patch(`/chat/${chatId}/members/${userId}/role`, { role: "admin" });
+  return response.data;
+};
