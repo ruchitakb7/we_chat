@@ -33,7 +33,7 @@ function mapApiMessage(rawMessage: RawMessage, currentUserId?: string): Message 
   const id = Number(rawMessage.id);
   const messageText = typeof rawMessage.message === "string" ? rawMessage.message : "";
   const caption = typeof rawMessage.caption === "string" ? rawMessage.caption : undefined;
-  const type = ["text", "image", "video", "file", "audio"].includes(String(rawMessage.type))
+  const type = ["text", "image", "video", "file", "audio","system"].includes(String(rawMessage.type))
     ? (rawMessage.type as Message["type"])
     : "text";
   const createdAt = rawMessage.createdAt ?? rawMessage.created_at;

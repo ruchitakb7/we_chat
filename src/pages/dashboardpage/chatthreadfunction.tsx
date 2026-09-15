@@ -75,6 +75,16 @@ export function MessageBubble({
 	chat: ChatItem;
 	searchQuery: string;
 }) {
+
+	if (message.type === "system") {
+	return (
+		<div className="flex justify-center my-3">
+			<div className="rounded-full bg-slate-100 px-4 py-1.5 text-xs text-slate-500">
+				{message.text}
+			</div>
+		</div>
+	);
+}
 	const mine = message.sender === "me";
 
 	return (

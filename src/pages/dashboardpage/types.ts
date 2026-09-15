@@ -42,7 +42,7 @@ export type Message = {
   text: string;
   time: string;
   createdAt?: string;
-  type?: "text" | "image" | "video" | "file" | "audio";
+  type?: "text" | "image" | "video" | "file" | "audio" | "system";
   mediaUrl?: string;
   caption?: string;
 };
