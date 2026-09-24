@@ -31,7 +31,9 @@ function getMessageList(response: unknown): RawMessage[] {
 
 function mapApiMessage(rawMessage: RawMessage, currentUserId?: string): Message | null {
   const id = Number(rawMessage.id);
-  const status= rawMessage.status;
+  const status = ["sent", "delivered", "read"].includes(String(rawMessage.status))
+    ? rawMessage.status as NonNullable<Message["status"]>
+    : null;
   const messageText = typeof rawMessage.message === "string" ? rawMessage.message : "";
   const caption = typeof rawMessage.caption === "string" ? rawMessage.caption : undefined;
   const type = ["text", "image", "video", "file", "audio", "system"].includes(String(rawMessage.type))
