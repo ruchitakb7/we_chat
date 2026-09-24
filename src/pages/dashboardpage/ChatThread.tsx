@@ -1,41 +1,12 @@
-import {
-  ArrowLeft,
-  FileText,
-  MoreVertical,
-  Paperclip,
-  Plus,
-  Search,
-  Send,
-  Smile,
-  Users,
-  Video,
-  Mic,
-  X,
-} from "lucide-react";
+import {ArrowLeft,FileText,MoreVertical,Paperclip,Plus,Search,Send,Smile,Users,Video,Mic,X,} from "lucide-react";
 import EmojiPicker, { Theme, type EmojiClickData } from "emoji-picker-react";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import socket from "../../lib/socket";
-
 import { cn } from "@/lib/utils";
 import type { ChatItem, Message } from "./types";
-import {
-  ChatAvatar,
-  formatLastSeen,
-  formatMessageDay,
-  getMessageDayKey,
-  MessageBubble,
-} from "./chatthreadfunction";
+import {ChatAvatar,formatLastSeen,formatMessageDay,getMessageDayKey,MessageBubble,} from "./chatthreadfunction";
 
-export function ChatThread({
-  selectedChat,
-  messages,
-  draft,
-  selectedFile,
-  onDraftChange,
-  onSend,
-  onFileChange,
-  onBack,
-  onOpenDetails,
+export function ChatThread({selectedChat,messages,draft,selectedFile,onDraftChange,onSend,onFileChange,onBack,onOpenDetails,
   scrollRef,
 }: {
   selectedChat: ChatItem;
@@ -253,79 +224,79 @@ export function ChatThread({
 
 
   useEffect(() => {
-  if (
-    selectedChat.type !== "private" ||
-    !selectedChat.userId
-  ) {
+    if (
+      selectedChat.type !== "private" ||
+      !selectedChat.userId
+    ) {
+      setIsOnline(false);
+      setlast_seen(null);
+      return;
+    }
+
     setIsOnline(false);
     setlast_seen(null);
-    return;
-  }
 
-  setIsOnline(false);
-  setlast_seen(null);
+    const targetUserId = selectedChat.userId;
 
-  const targetUserId = selectedChat.userId;
+    const checkOnlineStatus = () => {
+      socket.emit("check:user:online", targetUserId);
+    };
 
-  const checkOnlineStatus = () => {
-    socket.emit("check:user:online", targetUserId);
-  };
+    const handleStatus = ({
+      userId,
+      isOnline,
+      last_seen,
+    }: {
+      userId: string;
+      isOnline: boolean;
+      last_seen?: Date | null;
+    }) => {
+      if (userId === targetUserId) {
+        // console.log(
+        //   `User ${userId} is ${isOnline ? "online" : "offline"}`,
+        //   isOnline ? "" : `Last seen: ${last_seen ?? "unavailable"}`,
+        // );
+        setIsOnline(isOnline);
+        setlast_seen(isOnline ? null : last_seen ? String(last_seen) : null);
+      }
+    };
 
-  const handleStatus = ({
-    userId,
-    isOnline,
-    last_seen,
-  }: {
-    userId: string;
-    isOnline: boolean;
-    last_seen?:Date | null;
-  }) => {
-    if (userId === targetUserId) {
-      // console.log(
-      //   `User ${userId} is ${isOnline ? "online" : "offline"}`,
-      //   isOnline ? "" : `Last seen: ${last_seen ?? "unavailable"}`,
-      // );
-      setIsOnline(isOnline);
-      setlast_seen(isOnline ? null : last_seen ? String(last_seen) : null);
+    const handleOnline = (userId: string) => {
+      if (userId === targetUserId) {
+        setIsOnline(true);
+        setlast_seen(null);
+      }
+    };
+
+    const handleOffline = ({
+      userId,
+      last_seen,
+    }: {
+      userId: string;
+      last_seen?: string | Date | null;
+    }) => {
+      if (userId === targetUserId) {
+        setIsOnline(false);
+        setlast_seen(last_seen ? String(last_seen) : null);
+      }
+    };
+
+    socket.on("connect", checkOnlineStatus);
+    socket.on("user:online:status", handleStatus);
+    socket.on("user:online", handleOnline);
+    socket.on("user:offline", handleOffline);
+
+    // If already connected, check immediately
+    if (socket.connected) {
+      checkOnlineStatus();
     }
-  };
 
-  const handleOnline = (userId: string) => {
-    if (userId === targetUserId) {
-      setIsOnline(true);
-      setlast_seen(null);
-    }
-  };
-
-  const handleOffline = ({
-    userId,
-    last_seen,
-  }: {
-    userId: string;
-    last_seen?: string | Date | null;
-  }) => {
-    if (userId === targetUserId) {
-      setIsOnline(false);
-      setlast_seen(last_seen ? String(last_seen) : null);
-    }
-  };
-
-  socket.on("connect", checkOnlineStatus);
-  socket.on("user:online:status", handleStatus);
-  socket.on("user:online", handleOnline);
-  socket.on("user:offline", handleOffline);
-
-  // If already connected, check immediately
-  if (socket.connected) {
-    checkOnlineStatus();
-  }
-
-  return () => {
-    socket.off("connect", checkOnlineStatus);
-    socket.off("user:online:status", handleStatus);
-    socket.off("user:online", handleOnline);
-    socket.off("user:offline", handleOffline);
-  };
+    return () => {
+      socket.off("connect", checkOnlineStatus);
+      socket.off("user:online:status", handleStatus);
+      socket.off("user:online", handleOnline);
+      socket.off("user:offline", handleOffline);
+    };
   }, [selectedChat]);
 
   useEffect(() => {
@@ -333,7 +304,14 @@ export function ChatThread({
 
     const joinChat = () => {
       socket.emit("join:chat", chatId);
+
+      socket.emit("chat:opened", {
+        chatId,
+      });
+
+
     };
+
 
     socket.on("connect", joinChat);
 
@@ -364,11 +342,11 @@ export function ChatThread({
   return (
     <section className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-white">
       <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
-          <div
-            onClick={onOpenDetails}
-            className="flex items-center gap-3 text-left transition-opacity hover:opacity-80"
-            aria-label="Open chat details"
-          >
+        <div
+          onClick={onOpenDetails}
+          className="flex items-center gap-3 text-left transition-opacity hover:opacity-80"
+          aria-label="Open chat details"
+        >
           <button
             type="button"
             onClick={handleBackClick}
@@ -520,11 +498,11 @@ export function ChatThread({
               {!selectedFile.type.startsWith("image/") &&
                 !selectedFile.type.startsWith("video/") &&
                 !selectedFile.type.startsWith("audio/") && (
-                <div className="flex flex-col items-center gap-2 text-slate-500">
-                  <FileText className="h-12 w-12" />
-                  <span className="max-w-xs truncate text-sm">{selectedFile.name}</span>
-                </div>
-              )}
+                  <div className="flex flex-col items-center gap-2 text-slate-500">
+                    <FileText className="h-12 w-12" />
+                    <span className="max-w-xs truncate text-sm">{selectedFile.name}</span>
+                  </div>
+                )}
             </div>
 
             <div className="flex items-center gap-2 border-t border-slate-200 bg-white px-3 py-3">
@@ -590,83 +568,83 @@ export function ChatThread({
         ) : (
           <div className="rounded-3xl border border-slate-200 bg-white px-3 py-2 shadow-sm transition focus-within:border-indigo-300 focus-within:ring-2 focus-within:ring-indigo-100">
             <div className="flex items-end gap-2">
-            <input
-              id="chat-file-input"
-              type="file"
-              className="hidden"
-              onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
-            />
-            <button
-              aria-label="Attach file"
-              type="button"
-              onClick={() => document.getElementById("chat-file-input")?.click()}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-indigo-600"
-            >
-              <Paperclip className="h-4 w-4" />
-            </button>
-            <textarea
-              value={draft}
-              onChange={handleTyping}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-                  event.preventDefault();
-                  onSend();
-                }
-              }}
-              rows={1}
-              className="max-h-32 min-h-8 flex-1 resize-none bg-transparent py-1.5 text-sm leading-5 text-slate-700 outline-none placeholder:text-slate-400"
-            />
-            <div className="relative shrink-0">
-              {emojiPickerOpen && (
-                <div className="absolute right-0 bottom-10 z-20">
-                  <EmojiPicker
-                    onEmojiClick={handleEmojiClick}
-                    theme={Theme.LIGHT}
-                    width={300}
-                    height={360}
-                  />
-                </div>
-              )}
+              <input
+                id="chat-file-input"
+                type="file"
+                className="hidden"
+                onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
+              />
+              <button
+                aria-label="Attach file"
+                type="button"
+                onClick={() => document.getElementById("chat-file-input")?.click()}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-indigo-600"
+              >
+                <Paperclip className="h-4 w-4" />
+              </button>
+              <textarea
+                value={draft}
+                onChange={handleTyping}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                    event.preventDefault();
+                    onSend();
+                  }
+                }}
+                rows={1}
+                className="max-h-32 min-h-8 flex-1 resize-none bg-transparent py-1.5 text-sm leading-5 text-slate-700 outline-none placeholder:text-slate-400"
+              />
+              <div className="relative shrink-0">
+                {emojiPickerOpen && (
+                  <div className="absolute right-0 bottom-10 z-20">
+                    <EmojiPicker
+                      onEmojiClick={handleEmojiClick}
+                      theme={Theme.LIGHT}
+                      width={300}
+                      height={360}
+                    />
+                  </div>
+                )}
+                <button
+                  type="button"
+                  aria-label="Open emoji picker"
+                  onClick={() => setEmojiPickerOpen((open) => !open)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-indigo-600"
+                >
+                  <Smile className="h-5 w-5" />
+                </button>
+              </div>
+              <button
+                aria-label="Voice message"
+                type="button"
+                onClick={toggleVoiceRecording}
+                className={cn(
+                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition",
+                  isRecording
+                    ? "animate-pulse bg-rose-100 text-rose-600"
+                    : "text-slate-400 hover:bg-slate-100 hover:text-indigo-600",
+                )}
+              >
+                {isRecording ? (
+                  <span className="text-[10px] font-semibold">{recordingSeconds}s</span>
+                ) : (
+                  <Mic className="h-4 w-4" />
+                )}
+              </button>
               <button
                 type="button"
-                aria-label="Open emoji picker"
-                onClick={() => setEmojiPickerOpen((open) => !open)}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-indigo-600"
+                aria-label="Send message"
+                onClick={onSend}
+                disabled={!draft.trim()}
+                className={cn(
+                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white transition",
+                  draft.trim()
+                    ? "bg-indigo-600 hover:bg-indigo-700"
+                    : "cursor-not-allowed bg-indigo-300",
+                )}
               >
-                <Smile className="h-5 w-5" />
+                <Send className="ml-0.5 h-4 w-4" />
               </button>
-            </div>
-            <button
-              aria-label="Voice message"
-              type="button"
-              onClick={toggleVoiceRecording}
-              className={cn(
-                "flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition",
-                isRecording
-                  ? "animate-pulse bg-rose-100 text-rose-600"
-                  : "text-slate-400 hover:bg-slate-100 hover:text-indigo-600",
-              )}
-            >
-              {isRecording ? (
-                <span className="text-[10px] font-semibold">{recordingSeconds}s</span>
-              ) : (
-                <Mic className="h-4 w-4" />
-              )}
-            </button>
-            <button
-              type="button"
-              aria-label="Send message"
-              onClick={onSend}
-              disabled={!draft.trim()}
-              className={cn(
-                "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white transition",
-                draft.trim()
-                  ? "bg-indigo-600 hover:bg-indigo-700"
-                  : "cursor-not-allowed bg-indigo-300",
-              )}
-            >
-              <Send className="ml-0.5 h-4 w-4" />
-            </button>
             </div>
             <div className="flex items-center justify-between px-1 pt-1">
             </div>

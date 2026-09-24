@@ -35,6 +35,7 @@ export type ChatDetails = {
 
 export type Message = {
   id: number;
+  status?: "sent" | "delivered" | "read" | null;
   sender: "me" | "them";
   senderName?: string;
   senderUsername?: string;

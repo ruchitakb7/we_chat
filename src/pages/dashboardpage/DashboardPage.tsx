@@ -31,9 +31,10 @@ function getMessageList(response: unknown): RawMessage[] {
 
 function mapApiMessage(rawMessage: RawMessage, currentUserId?: string): Message | null {
   const id = Number(rawMessage.id);
+  const status= rawMessage.status;
   const messageText = typeof rawMessage.message === "string" ? rawMessage.message : "";
   const caption = typeof rawMessage.caption === "string" ? rawMessage.caption : undefined;
-  const type = ["text", "image", "video", "file", "audio","system"].includes(String(rawMessage.type))
+  const type = ["text", "image", "video", "file", "audio", "system"].includes(String(rawMessage.type))
     ? (rawMessage.type as Message["type"])
     : "text";
   const createdAt = rawMessage.createdAt ?? rawMessage.created_at;
@@ -65,6 +66,7 @@ function mapApiMessage(rawMessage: RawMessage, currentUserId?: string): Message 
 
   return {
     id,
+    status,
     sender: senderId === currentUserId ? "me" : "them",
     senderName,
     senderUsername,
@@ -159,8 +161,8 @@ function DashboardPage() {
       avatar: privateChat.profileimg
         ? getUploadedFileUrl(privateChat.profileimg)
         : `https://ui-avatars.com/api/?name=${encodeURIComponent(
-            privateChat.name,
-          )}&background=4f46e5&color=fff`,
+          privateChat.name,
+        )}&background=4f46e5&color=fff`,
       profileimg: privateChat.profileimg ?? null,
     };
 
@@ -195,17 +197,46 @@ function DashboardPage() {
 
     const handleNewMessage = (rawMessage: RawMessage) => {
       const nestedChat = rawMessage.chat;
-      const nestedChatId = nestedChat && typeof nestedChat === "object"
-        ? (nestedChat as Record<string, unknown>).id
-        : undefined;
-      const incomingChatId = Number(rawMessage.chatId ?? rawMessage.chat_id ?? nestedChatId);
-      if (!active || incomingChatId !== chatId) return;
 
-      const newMessage = mapApiMessage(rawMessage, currentUser?.id);
-      if (!newMessage) return;
+      const nestedChatId =
+        nestedChat && typeof nestedChat === "object"
+          ? (nestedChat as Record<string, unknown>).id
+          : undefined;
+
+      const incomingChatId = Number(
+        rawMessage.chatId ??
+        rawMessage.chat_id ??
+        nestedChatId
+      );
+
+      // Ignore messages that are not for the currently selected chat
+      if (!active || incomingChatId !== chatId) {
+        return;
+      }
+
+      const newMessage = mapApiMessage(
+        rawMessage,
+        currentUser?.id
+      );
+
+      if (!newMessage) {
+        return;
+      }
+
+     
+      if (newMessage.sender === "them") {
+        socket.emit("message:read", {
+          messageId: newMessage.id,
+        });
+      }
 
       setMessages((previousMessages) => {
-        if (previousMessages.some((message) => message.id === newMessage.id)) {
+        // Prevent duplicate messages
+        if (
+          previousMessages.some(
+            (message) => message.id === newMessage.id
+          )
+        ) {
           return previousMessages;
         }
 
@@ -213,7 +244,54 @@ function DashboardPage() {
       });
     };
 
+    // const handleNewMessage = (rawMessage: RawMessage) => {
+    //   const nestedChat = rawMessage.chat;
+    //   const nestedChatId = nestedChat && typeof nestedChat === "object"
+    //     ? (nestedChat as Record<string, unknown>).id
+    //     : undefined;
+    //   const incomingChatId = Number(rawMessage.chatId ?? rawMessage.chat_id ?? nestedChatId);
+    //   if (!active || incomingChatId !== chatId) return;
+
+    //   const newMessage = mapApiMessage(rawMessage, currentUser?.id);
+    //   if (!newMessage) return;
+
+    //   if (newMessage.sender === "them") {
+    //     socket.emit("message:delivered", {
+    //       messageId: newMessage.id,
+    //     });
+    //   }
+
+    //   setMessages((previousMessages) => {
+    //     if (previousMessages.some((message) => message.id === newMessage.id)) {
+    //       return previousMessages;
+    //     }
+
+    //     return [...previousMessages, newMessage];
+    //   });
+    // };
+
+
+    const handleMessageStatus = ({
+      messageId,
+      status,
+    }: {
+      messageId: number;
+      status: "sent" | "delivered" | "read";
+    }) => {
+      setMessages((previousMessages) =>
+        previousMessages.map((message) =>
+          message.id === messageId
+            ? {
+              ...message,
+              status,
+            }
+            : message
+        )
+      );
+    };
+
     socket.on("new:message", handleNewMessage);
+    socket.on("message:status", handleMessageStatus);
 
     void getMessages(chatId)
       .then((response) => {
@@ -238,6 +316,7 @@ function DashboardPage() {
     return () => {
       active = false;
       socket.off("new:message", handleNewMessage);
+       socket.off("message:status", handleMessageStatus);
     };
   }, [currentUser?.id, selectedChat]);
 

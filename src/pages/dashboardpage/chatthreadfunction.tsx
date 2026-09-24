@@ -1,4 +1,4 @@
-import { CheckCheck, Users } from "lucide-react";
+import { CheckCheck, Users ,Check} from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
@@ -77,14 +77,14 @@ export function MessageBubble({
 }) {
 
 	if (message.type === "system") {
-	return (
-		<div className="flex justify-center my-3">
-			<div className="rounded-full bg-slate-100 px-4 py-1.5 text-xs text-slate-500">
-				{message.text}
+		return (
+			<div className="flex justify-center my-3">
+				<div className="rounded-full bg-slate-100 px-4 py-1.5 text-xs text-slate-500">
+					{message.text}
+				</div>
 			</div>
-		</div>
-	);
-}
+		);
+	}
 	const mine = message.sender === "me";
 
 	return (
@@ -131,9 +131,32 @@ export function MessageBubble({
 						<HighlightedText text={message.text} query={searchQuery} />
 					</a>
 				)}
-				<div className={cn("mt-1.5 flex items-center gap-1 text-[10px]", mine ? "justify-end text-indigo-200" : "text-slate-400")}>
+				<div
+					className={cn(
+						"mt-1.5 flex items-center gap-1 text-[10px]",
+						mine
+							? "justify-end text-indigo-200"
+							: "text-slate-400"
+					)}
+				>
 					<span>{message.time}</span>
-					{mine && <CheckCheck className="h-3.5 w-3.5" />}
+
+					{mine && message.status === "sent" && (
+						<Check className="h-3.5 w-3.5" />
+					)}
+
+					{mine &&
+						(message.status === "delivered" ||
+							message.status === "read") && (
+							<CheckCheck
+								className={cn(
+									"h-3.5 w-3.5",
+									message.status === "read"
+										? "text-blue-500"
+										: "text-slate-400"
+								)}
+							/>
+						)}
 				</div>
 			</div>
 		</div>
