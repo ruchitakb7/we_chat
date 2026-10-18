@@ -449,7 +449,11 @@ export function ChatThread({selectedChat,messages,draft,selectedFile,onDraftChan
                       {formatMessageDay(dayKey)}
                     </div>
                   )}
-                  <MessageBubble message={message} chat={selectedChat} searchQuery={searchQuery} />
+                  <MessageBubble
+                    message={message}
+                    chat={selectedChat}
+                    searchQuery={searchQuery}
+                  />
                 </div>
               );
             })}

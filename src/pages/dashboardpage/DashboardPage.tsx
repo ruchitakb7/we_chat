@@ -15,6 +15,16 @@ import socket from "@/lib/socket";
 
 type RawMessage = Record<string, unknown>;
 
+const messageStatusRank: Record<NonNullable<Message["status"]>, number> = {
+  sent: 1,
+  delivered: 2,
+  read: 3,
+};
+
+function getMessageStatusRank(status: Message["status"]) {
+  return status ? messageStatusRank[status] : 0;
+}
+
 function getMessageList(response: unknown): RawMessage[] {
   if (Array.isArray(response)) {
     return response.filter((message): message is RawMessage => Boolean(message && typeof message === "object"));
@@ -246,32 +256,6 @@ function DashboardPage() {
       });
     };
 
-    // const handleNewMessage = (rawMessage: RawMessage) => {
-    //   const nestedChat = rawMessage.chat;
-    //   const nestedChatId = nestedChat && typeof nestedChat === "object"
-    //     ? (nestedChat as Record<string, unknown>).id
-    //     : undefined;
-    //   const incomingChatId = Number(rawMessage.chatId ?? rawMessage.chat_id ?? nestedChatId);
-    //   if (!active || incomingChatId !== chatId) return;
-
-    //   const newMessage = mapApiMessage(rawMessage, currentUser?.id);
-    //   if (!newMessage) return;
-
-    //   if (newMessage.sender === "them") {
-    //     socket.emit("message:delivered", {
-    //       messageId: newMessage.id,
-    //     });
-    //   }
-
-    //   setMessages((previousMessages) => {
-    //     if (previousMessages.some((message) => message.id === newMessage.id)) {
-    //       return previousMessages;
-    //     }
-
-    //     return [...previousMessages, newMessage];
-    //   });
-    // };
-
 
     const handleMessageStatus = ({
       messageId,
@@ -285,7 +269,9 @@ function DashboardPage() {
           message.id === messageId
             ? {
               ...message,
-              status,
+              status: getMessageStatusRank(status) > getMessageStatusRank(message.status)
+                ? status
+                : message.status,
             }
             : message
         )
@@ -303,9 +289,20 @@ function DashboardPage() {
           .map((message) => mapApiMessage(message, currentUser?.id))
           .filter((message): message is Message => message !== null);
         setMessages((previousMessages) => {
-          const loadedIds = new Set(loadedMessages.map((message) => message.id));
+          const previousById = new Map(previousMessages.map((message) => [message.id, message]));
+          const mergedMessages = loadedMessages.map((message) => {
+            const previousMessage = previousById.get(message.id);
+            if (
+              previousMessage &&
+              getMessageStatusRank(previousMessage.status) > getMessageStatusRank(message.status)
+            ) {
+              return { ...message, status: previousMessage.status };
+            }
+            return message;
+          });
+          const loadedIds = new Set(mergedMessages.map((message) => message.id));
           const liveMessages = previousMessages.filter((message) => !loadedIds.has(message.id));
-          return [...loadedMessages, ...liveMessages];
+          return [...mergedMessages, ...liveMessages];
         });
       })
       .catch((error) => {

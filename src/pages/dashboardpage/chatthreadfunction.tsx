@@ -87,6 +87,8 @@ export function MessageBubble({
 	}
 	const mine = message.sender === "me";
 
+	console.log(message, "message in bubble");
+
 	return (
 		<div className={cn("flex items-end gap-2.5", mine ? "justify-end" : "justify-start")}>
 			{!mine && (
@@ -142,7 +144,7 @@ export function MessageBubble({
 					<span>{message.time}</span>
 
 					{mine && message.status === "sent" && (
-						<Check className="h-3.5 w-3.5" />
+						<Check className="h-3.5 w-3.5 text-slate-800" />
 					)}
 
 					{mine &&
