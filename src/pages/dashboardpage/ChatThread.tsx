@@ -238,8 +238,30 @@ export function ChatThread({selectedChat,messages,draft,selectedFile,onDraftChan
 
     const targetUserId = selectedChat.userId;
 
+    let statusReceived = false;
+    let statusRetryTimer: ReturnType<typeof window.setTimeout> | null = null;
+
     const checkOnlineStatus = () => {
       socket.emit("check:user:online", targetUserId);
+
+      if (statusRetryTimer) {
+        window.clearTimeout(statusRetryTimer);
+      }
+
+      statusRetryTimer = window.setTimeout(() => {
+        if (!statusReceived && socket.connected) {
+          socket.emit("check:user:online", targetUserId);
+        }
+        statusRetryTimer = null;
+      }, 1000);
+    };
+
+    const markStatusReceived = () => {
+      statusReceived = true;
+      if (statusRetryTimer) {
+        window.clearTimeout(statusRetryTimer);
+        statusRetryTimer = null;
+      }
     };
 
     const handleStatus = ({
@@ -247,11 +269,12 @@ export function ChatThread({selectedChat,messages,draft,selectedFile,onDraftChan
       isOnline,
       last_seen,
     }: {
-      userId: string;
+      userId: string | number;
       isOnline: boolean;
-      last_seen?: Date | null;
+      last_seen?: string | Date | null;
     }) => {
-      if (userId === targetUserId) {
+      if (String(userId) === targetUserId) {
+        markStatusReceived();
         // console.log(
         //   `User ${userId} is ${isOnline ? "online" : "offline"}`,
         //   isOnline ? "" : `Last seen: ${last_seen ?? "unavailable"}`,
@@ -261,8 +284,9 @@ export function ChatThread({selectedChat,messages,draft,selectedFile,onDraftChan
       }
     };
 
-    const handleOnline = (userId: string) => {
-      if (userId === targetUserId) {
+    const handleOnline = (userId: string | number) => {
+      if (String(userId) === targetUserId) {
+        markStatusReceived();
         setIsOnline(true);
         setlast_seen(null);
       }
@@ -272,10 +296,11 @@ export function ChatThread({selectedChat,messages,draft,selectedFile,onDraftChan
       userId,
       last_seen,
     }: {
-      userId: string;
+      userId: string | number;
       last_seen?: string | Date | null;
     }) => {
-      if (userId === targetUserId) {
+      if (String(userId) === targetUserId) {
+        markStatusReceived();
         setIsOnline(false);
         setlast_seen(last_seen ? String(last_seen) : null);
       }
@@ -296,6 +321,9 @@ export function ChatThread({selectedChat,messages,draft,selectedFile,onDraftChan
       socket.off("user:online:status", handleStatus);
       socket.off("user:online", handleOnline);
       socket.off("user:offline", handleOffline);
+      if (statusRetryTimer) {
+        window.clearTimeout(statusRetryTimer);
+      }
     };
   }, [selectedChat]);
 
